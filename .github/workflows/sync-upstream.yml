@@ -1,0 +1,21 @@
+name: Sync upstream
+
+on:
+  schedule:
+    # 每天凌晨3点运行（UTC时间），相当于北京时间上午11点
+    - cron: '0 3 * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync Fork
+        uses: repo-sync/github-sync@v2
+        with:
+          # 60s-web 的上游原始仓库
+          source_repo: 'dogxii/60s-web'
+          source_branch: 'main'
+          destination_branch: 'main'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
