@@ -42,6 +42,7 @@ import { WeatherCard } from "./Weather";
 
 type HomePageProps = {
 	apiBase: string;
+	apiReady: boolean;
 	setApiBase: (value: string) => void;
 	city: string;
 	setCity: (city: string) => void;
@@ -68,6 +69,7 @@ type HomePageProps = {
 
 export function HomePage({
 	apiBase,
+	apiReady,
 	setApiBase,
 	city,
 	setCity,
@@ -313,7 +315,11 @@ export function HomePage({
 		if (cardId === "entertainmentTools") {
 			return (
 				<div className="home-right-split">
-					<EntertainmentCard epic={epic} movies={movieItems} />
+					<EntertainmentCard
+						epic={epic}
+						movies={movieItems}
+						apiReady={apiReady}
+					/>
 					<ToolShortcuts
 						apiBase={apiBase}
 						setActivePage={setActivePage}

@@ -41,6 +41,7 @@ export function EndpointLab({
 		() => tryBuildUrl(apiBase, active.path, params),
 		[active.path, apiBase, params],
 	);
+	const hasApiBase = Boolean(apiBase.trim());
 	const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
 	const favoriteEndpoints = useMemo(
 		() =>
@@ -128,7 +129,7 @@ export function EndpointLab({
 												打开 <ExternalLink size={14} />
 											</a>
 										) : (
-											<span>地址无效</span>
+											<span>{hasApiBase ? "地址无效" : "先配置 API"}</span>
 										)}
 										<button
 											type="button"
@@ -235,7 +236,9 @@ export function EndpointLab({
 									打开 <ExternalLink size={15} />
 								</a>
 							) : (
-								<span className="disabled-link">地址无效</span>
+								<span className="disabled-link">
+									{hasApiBase ? "地址无效" : "先配置 API"}
+								</span>
 							)}
 						</div>
 					</div>
@@ -265,7 +268,11 @@ export function EndpointLab({
 							</label>
 						))}
 						<div className="runner-actions">
-							<button type="submit" className="primary-subtle">
+							<button
+								type="submit"
+								className="primary-subtle"
+								disabled={!hasApiBase}
+							>
 								{result.loading ? (
 									<Loader2 className="spin" size={17} />
 								) : (

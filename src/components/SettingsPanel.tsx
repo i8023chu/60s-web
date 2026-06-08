@@ -2,6 +2,7 @@ import {
 	AlertTriangle,
 	CheckCircle2,
 	Download,
+	ExternalLink,
 	FileUp,
 	Image as ImageIcon,
 	LayoutGrid,
@@ -14,9 +15,10 @@ import {
 	Sun,
 	Wifi,
 } from "lucide-react";
-import { useRef, useState } from "react";
-import { fetchApi, getApiBaseError } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { fetchApi, normalizeApiBase, normalizeApiBaseInput } from "../api";
 import {
+	API_DOCS_URL,
 	chromeThemes,
 	colorThemes,
 	mobileNavModes,
@@ -38,6 +40,34 @@ type ConfigActionResult = {
 	ok: boolean;
 	message: string;
 };
+
+function normalizeOptionalApiBase(value: string) {
+	return value.trim() ? normalizeApiBaseInput(value) : "";
+}
+
+function getApiBaseCandidates(value: string) {
+	const cleanValue = value.trim();
+	if (!cleanValue) throw new Error("请输入 API 地址");
+	const withProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(cleanValue)
+		? cleanValue
+		: `https://${cleanValue}`;
+	return Array.from(
+		new Set([
+			normalizeApiBaseInput(cleanValue),
+			normalizeApiBase(withProtocol),
+		]),
+	);
+}
+
+async function checkApiBase(base: string) {
+	const controller = new AbortController();
+	const timer = window.setTimeout(() => controller.abort(), 6000);
+	try {
+		await fetchApi(base, "/60s", {}, controller.signal);
+	} finally {
+		window.clearTimeout(timer);
+	}
+}
 
 export function SettingsPanel({
 	apiBase,
@@ -86,10 +116,35 @@ export function SettingsPanel({
 		status: "idle" | "checking" | "success" | "error";
 		message: string;
 	}>({ status: "idle", message: "" });
+	const [apiDraft, setApiDraft] = useState(apiBase);
 	const [configNotice, setConfigNotice] = useState<ConfigActionResult | null>(
 		null,
 	);
 	const favoriteQuickSet = new Set(quickFavorites || []);
+
+	useEffect(() => {
+		setApiDraft(apiBase);
+	}, [apiBase]);
+
+	const saveApiBase = () => {
+		try {
+			const normalized = normalizeOptionalApiBase(apiDraft);
+			setApiBase(normalized);
+			setApiDraft(normalized);
+			setApiCheck({
+				status: "success",
+				message: normalized
+					? "API 地址已保存，数据会使用新地址同步。"
+					: "已清空 API 地址，页面不会自动请求。",
+			});
+		} catch (error) {
+			setApiCheck({
+				status: "error",
+				message: error instanceof Error ? error.message : "API 地址无效",
+			});
+		}
+	};
+
 	const handleWallpaperFile = (file?: File) => {
 		if (!file || !setWallpaper) return;
 		if (!file.type.startsWith("image/")) return;
@@ -106,31 +161,46 @@ export function SettingsPanel({
 	};
 
 	const checkApiConnection = async () => {
-		const baseError = getApiBaseError(apiBase);
-		if (baseError) {
-			setApiCheck({ status: "error", message: baseError });
+		let candidates: string[];
+		try {
+			candidates = getApiBaseCandidates(apiDraft);
+		} catch (error) {
+			setApiCheck({
+				status: "error",
+				message: error instanceof Error ? error.message : "API 地址无效",
+			});
 			return;
 		}
 
-		const controller = new AbortController();
-		const timer = window.setTimeout(() => controller.abort(), 6000);
 		setApiCheck({ status: "checking", message: "正在检测 API 连接..." });
+		let lastError: unknown;
 		try {
-			await fetchApi(apiBase, "/60s", {}, controller.signal);
-			setApiCheck({
-				status: "success",
-				message: "连接正常，/60s 接口可以访问。",
-			});
-		} catch (error) {
+			for (const candidate of candidates) {
+				try {
+					await checkApiBase(candidate);
+					setApiBase(candidate);
+					setApiDraft(candidate);
+					setApiCheck({
+						status: "success",
+						message: "连接正常，API 地址已保存。",
+					});
+					return;
+				} catch (error) {
+					lastError = error;
+				}
+			}
 			const message =
-				error instanceof DOMException && error.name === "AbortError"
+				lastError instanceof DOMException && lastError.name === "AbortError"
 					? "检测超时，请确认 API 服务可访问。"
-					: error instanceof Error
-						? error.message
+					: lastError instanceof Error
+						? lastError.message
 						: "检测失败，请稍后重试。";
 			setApiCheck({ status: "error", message });
-		} finally {
-			window.clearTimeout(timer);
+		} catch (error) {
+			setApiCheck({
+				status: "error",
+				message: error instanceof Error ? error.message : "检测失败，请稍后重试。",
+			});
 		}
 	};
 
@@ -180,16 +250,41 @@ export function SettingsPanel({
 		>
 			<CardTitle icon={<Settings size={21} />} title="全局设置" />
 			<div className="settings-grid">
-				<label className="api-base">
-					默认 API
+				<div className="api-base api-setting-row">
+					<span className="api-field-title">
+						<span>API 地址</span>
+						<a
+							className="settings-inline-link"
+							href={API_DOCS_URL}
+							target="_blank"
+							rel="noreferrer"
+						>
+							不知道填什么？公共实例列表 <ExternalLink size={13} />
+						</a>
+					</span>
 					<span className="api-control-row">
 						<input
-							value={apiBase}
+							value={apiDraft}
 							onChange={(event) => {
-								setApiBase(event.target.value);
+								setApiDraft(event.target.value);
 								setApiCheck({ status: "idle", message: "" });
 							}}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									event.preventDefault();
+									saveApiBase();
+								}
+							}}
+							placeholder="https://example.com/v2"
 						/>
+						<button
+							type="button"
+							className="outline-button"
+							onClick={saveApiBase}
+							disabled={apiCheck.status === "checking"}
+						>
+							保存
+						</button>
 						<button
 							type="button"
 							className="outline-button"
@@ -216,7 +311,7 @@ export function SettingsPanel({
 							{apiCheck.message}
 						</span>
 					)}
-				</label>
+				</div>
 				{!compact && city !== undefined && setCity && (
 					<label className="api-base city-setting">
 						默认城市
@@ -486,12 +581,29 @@ export function HomeModuleSettings({
 	settings: SettingsState;
 	setSettings: (value: SettingsState) => void;
 }) {
+	const [apiDraft, setApiDraft] = useState(apiBase);
+	const [apiNotice, setApiNotice] = useState("");
 	const toggles: Array<[keyof SettingsState, string]> = [
 		["showWeather", "显示天气"],
 		["showHot", "显示热榜"],
 		["showNews", "显示新闻"],
 		["autoRefresh", "自动刷新"],
 	];
+
+	useEffect(() => {
+		setApiDraft(apiBase);
+	}, [apiBase]);
+
+	const saveApiBase = () => {
+		try {
+			const normalized = normalizeOptionalApiBase(apiDraft);
+			setApiBase(normalized);
+			setApiDraft(normalized);
+			setApiNotice(normalized ? "API 地址已保存" : "已清空 API 地址");
+		} catch (error) {
+			setApiNotice(error instanceof Error ? error.message : "API 地址无效");
+		}
+	};
 
 	return (
 		<article className="card settings-panel home-module-settings">
@@ -517,13 +629,45 @@ export function HomeModuleSettings({
 						placeholder="例如 上海"
 					/>
 				</label>
-				<label className="api-base">
-					API 设置
-					<input
-						value={apiBase}
-						onChange={(event) => setApiBase(event.target.value)}
-					/>
-				</label>
+				<div className="api-base api-setting-row">
+					<span className="api-field-title">
+						<span>API 设置</span>
+						<a
+							className="settings-inline-link"
+							href={API_DOCS_URL}
+							target="_blank"
+							rel="noreferrer"
+						>
+							公共实例 <ExternalLink size={13} />
+						</a>
+					</span>
+					<span className="api-compact-row">
+						<input
+							value={apiDraft}
+							onChange={(event) => {
+								setApiDraft(event.target.value);
+								setApiNotice("");
+							}}
+							onKeyDown={(event) => {
+								if (event.key === "Enter") {
+									event.preventDefault();
+									saveApiBase();
+								}
+							}}
+							placeholder="https://example.com/v2"
+						/>
+							<button
+								type="button"
+								className="outline-button"
+								onClick={saveApiBase}
+							>
+								保存
+							</button>
+						</span>
+						{apiNotice && (
+							<small className="api-inline-notice">{apiNotice}</small>
+						)}
+					</div>
 			</div>
 		</article>
 	);

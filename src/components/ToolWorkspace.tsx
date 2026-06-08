@@ -85,8 +85,13 @@ function TranslateTool({ apiBase }: { apiBase: string }) {
 	const [result, setResult] = useState<ApiState<TranslationResult>>({
 		loading: false,
 	});
+	const hasApiBase = Boolean(apiBase.trim());
 
 	const run = useCallback(async () => {
+		if (!hasApiBase) {
+			setResult({ loading: false });
+			return;
+		}
 		setResult({ loading: true });
 		try {
 			const payload = await fetchApi<TranslationResult>(apiBase, "/fanyi", {
@@ -105,7 +110,7 @@ function TranslateTool({ apiBase }: { apiBase: string }) {
 				error: error instanceof Error ? error.message : "请求失败",
 			});
 		}
-	}, [apiBase, target, text]);
+	}, [apiBase, hasApiBase, target, text]);
 
 	useEffect(() => {
 		void run();
@@ -141,6 +146,7 @@ function TranslateTool({ apiBase }: { apiBase: string }) {
 						type="button"
 						className="primary-subtle"
 						onClick={() => void run()}
+						disabled={!hasApiBase}
 					>
 						<RefreshCw size={16} /> 重新翻译
 					</button>
@@ -167,8 +173,13 @@ function QrcodeTool({ apiBase }: { apiBase: string }) {
 	const [result, setResult] = useState<ApiState<QrCodeResult>>({
 		loading: false,
 	});
+	const hasApiBase = Boolean(apiBase.trim());
 
 	const run = useCallback(async () => {
+		if (!hasApiBase) {
+			setResult({ loading: false });
+			return;
+		}
 		setResult({ loading: true });
 		try {
 			const payload = await fetchApi<QrCodeResult>(apiBase, "/qrcode", {
@@ -187,7 +198,7 @@ function QrcodeTool({ apiBase }: { apiBase: string }) {
 				error: error instanceof Error ? error.message : "请求失败",
 			});
 		}
-	}, [apiBase, text]);
+	}, [apiBase, hasApiBase, text]);
 
 	useEffect(() => {
 		void run();
@@ -215,6 +226,7 @@ function QrcodeTool({ apiBase }: { apiBase: string }) {
 						type="button"
 						className="primary-subtle"
 						onClick={() => void run()}
+						disabled={!hasApiBase}
 					>
 						<RefreshCw size={16} /> 重新生成
 					</button>
@@ -242,8 +254,13 @@ function PasswordTool({ apiBase }: { apiBase: string }) {
 	const [result, setResult] = useState<ApiState<PasswordResult>>({
 		loading: false,
 	});
+	const hasApiBase = Boolean(apiBase.trim());
 
 	const run = useCallback(async () => {
+		if (!hasApiBase) {
+			setResult({ loading: false });
+			return;
+		}
 		setResult({ loading: true });
 		try {
 			const payload = await fetchApi<PasswordResult>(apiBase, "/password", {
@@ -261,7 +278,7 @@ function PasswordTool({ apiBase }: { apiBase: string }) {
 				error: error instanceof Error ? error.message : "请求失败",
 			});
 		}
-	}, [apiBase, length, symbols]);
+	}, [apiBase, hasApiBase, length, symbols]);
 
 	useEffect(() => {
 		void run();
@@ -298,6 +315,7 @@ function PasswordTool({ apiBase }: { apiBase: string }) {
 						type="button"
 						className="primary-subtle"
 						onClick={() => void run()}
+						disabled={!hasApiBase}
 					>
 						<RefreshCw size={16} /> 再生成一个
 					</button>
@@ -329,8 +347,13 @@ function PaletteTool({ apiBase }: { apiBase: string }) {
 	const [result, setResult] = useState<ApiState<ColorPaletteResult>>({
 		loading: false,
 	});
+	const hasApiBase = Boolean(apiBase.trim());
 
 	const run = useCallback(async () => {
+		if (!hasApiBase) {
+			setResult({ loading: false });
+			return;
+		}
 		setResult({ loading: true });
 		try {
 			const payload = await fetchApi<ColorPaletteResult>(
@@ -349,7 +372,7 @@ function PaletteTool({ apiBase }: { apiBase: string }) {
 				error: error instanceof Error ? error.message : "请求失败",
 			});
 		}
-	}, [apiBase, color]);
+	}, [apiBase, color, hasApiBase]);
 
 	useEffect(() => {
 		void run();
@@ -385,6 +408,7 @@ function PaletteTool({ apiBase }: { apiBase: string }) {
 						type="button"
 						className="primary-subtle"
 						onClick={() => void run()}
+						disabled={!hasApiBase}
 					>
 						<RefreshCw size={16} /> 重新生成
 					</button>

@@ -42,6 +42,7 @@ export const STORAGE_KEYS = {
 	colorTheme: "60s-web:color-theme",
 	mobileNavMode: "60s-web:mobile-nav-mode",
 	iosInstallHintDismissed: "60s-web:ios-install-hint-dismissed",
+	apiGuideDismissed: "60s-web:api-guide-dismissed",
 	homeCardLayout: "60s-web:home-card-layout",
 	endpointFavorites: "60s-web:endpoint-favorites",
 	quickFavorites: "60s-web:quick-favorites",
@@ -240,6 +241,7 @@ export const EPIC_COVER_PLACEHOLDER =
 	"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='172' height='116' viewBox='0 0 172 116'><rect width='172' height='116' rx='12' fill='%23f3f6f8'/><rect x='16' y='16' width='140' height='84' rx='10' fill='%23e7eef3'/><path d='M36 82l24-26 18 18 26-30 32 38H36z' fill='%23c9d6df'/><circle cx='58' cy='44' r='9' fill='%23d7e3ea'/><text x='86' y='104' text-anchor='middle' font-size='12' fill='%23667885' font-family='Arial, sans-serif'>Epic Cover</text></svg>";
 export const API_REPO_URL = "https://github.com/vikiboss/60s";
 export const WEB_REPO_URL = "https://github.com/dogxii/60s-web";
+export const API_DOCS_URL = "https://docs.60s-api.viki.moe/7306811m0";
 
 export const categoryLabels: Record<EndpointDefinition["category"], string> = {
 	periodic: "周期资讯",

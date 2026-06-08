@@ -1,4 +1,4 @@
-export const DEFAULT_API_BASE = "https://60s.viki.moe/v2";
+export const DEFAULT_API_BASE = "";
 
 export type ApiCategory =
 	| "periodic"
@@ -998,6 +998,19 @@ export function normalizeApiBase(base: string) {
 
 	const path = url.pathname.replace(/\/+$/, "");
 	return `${url.origin}${path === "/" ? "" : path}`;
+}
+
+export function normalizeApiBaseInput(base: string) {
+	const cleanBase = base.trim();
+	if (!cleanBase) {
+		throw new Error("请输入 API 地址");
+	}
+	const withProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(cleanBase)
+		? cleanBase
+		: `https://${cleanBase}`;
+	const normalized = normalizeApiBase(withProtocol);
+	const url = new URL(normalized);
+	return url.pathname === "/" ? `${normalized}/v2` : normalized;
 }
 
 export function getApiBaseError(base: string) {

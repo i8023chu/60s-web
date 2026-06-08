@@ -72,7 +72,7 @@ export function MarketStrip({
 				/>
 				<Metric
 					icon={<CalendarClock size={31} />}
-					label="自动刷新"
+					label="本地缓存"
 					value="10 分钟"
 					sub="手动刷新可跳过缓存"
 				/>
@@ -84,9 +84,11 @@ export function MarketStrip({
 export function EntertainmentCard({
 	epic,
 	movies,
+	apiReady,
 }: {
 	epic: ApiState<EpicGame[]>;
 	movies: HotItem[];
+	apiReady: boolean;
 }) {
 	const games = epic.data?.slice(0, 2) ?? [];
 	return (
@@ -98,7 +100,11 @@ export function EntertainmentCard({
 						<b>电影票房</b>
 						<small>实时</small>
 					</div>
-					{movies.length === 0 && <p className="muted">正在读取票房...</p>}
+					{movies.length === 0 && (
+						<p className="muted">
+							{apiReady ? "正在读取票房..." : "配置 API 后同步票房..."}
+						</p>
+					)}
 					{movies.map((movie, index) => (
 						<div
 							className="compact-row"
@@ -118,6 +124,11 @@ export function EntertainmentCard({
 						<b>Epic 本周免费游戏</b>
 						<small>每周</small>
 					</div>
+					{games.length === 0 && (
+						<p className="muted">
+							{apiReady ? "正在读取游戏..." : "配置 API 后同步游戏..."}
+						</p>
+					)}
 					{games.map((game) => (
 						<a
 							className="game-row"
@@ -218,7 +229,7 @@ export function ToolShortcuts({
 							<Icon size={24} />
 							<span>
 								<b>{tool.label}</b>
-								<small>API 地址无效</small>
+								<small>{apiBase.trim() ? "API 地址无效" : "先配置 API"}</small>
 							</span>
 						</button>
 					);

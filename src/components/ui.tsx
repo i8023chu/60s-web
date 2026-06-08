@@ -49,6 +49,9 @@ export function Status({ state }: { state: ApiState<unknown> }) {
 			</span>
 		);
 	if (state.error) return <span className="status error">失败</span>;
+	if (state.data === undefined && !state.updatedAt) {
+		return <span className="status">未同步</span>;
+	}
 	return (
 		<span className="status">
 			<CheckCircle2 size={15} /> 已同步
@@ -139,7 +142,7 @@ export function Footer({
 					<span className="footer-separator" />
 					<span className="footer-meta api-link">
 						<Globe2 size={16} />
-						{apiBase.replace(/^https?:\/\//, "")}
+						{apiBase ? apiBase.replace(/^https?:\/\//, "") : "未配置 API"}
 					</span>
 				</div>
 				<div className="footer-right">

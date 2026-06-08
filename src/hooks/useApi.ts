@@ -9,12 +9,42 @@ import { CACHE_TTL } from "../config";
 import { readCache, writeCache } from "../storage";
 import type { ApiState } from "../types";
 
+type RequestResult<T> = {
+	data: T | undefined;
+	updatedAt: number;
+};
+
+const inFlightRequests = new Map<string, Promise<RequestResult<unknown>>>();
+
+function requestWithDedupe<T>(
+	cacheKey: string,
+	base: string,
+	path: string,
+	params: Record<string, string | undefined>,
+) {
+	const pending = inFlightRequests.get(cacheKey);
+	if (pending) return pending as Promise<RequestResult<T>>;
+
+	const request = fetchApi<T>(base, path, params)
+		.then((payload) => {
+			const data = unwrap(payload);
+			const updatedAt = Date.now();
+			writeCache(cacheKey, data, updatedAt);
+			return { data, updatedAt };
+		})
+		.finally(() => {
+			inFlightRequests.delete(cacheKey);
+		});
+	inFlightRequests.set(cacheKey, request as Promise<RequestResult<unknown>>);
+	return request;
+}
+
 export function useApi<T>(
 	base: string,
 	path: string,
 	params: Record<string, string | undefined>,
 	enabled = true,
-	autoRefresh = true,
+	autoRefresh = false,
 ) {
 	const paramsKey = JSON.stringify(params);
 	const stableParams = useMemo(
@@ -71,10 +101,12 @@ export function useApi<T>(
 
 			setState((current) => ({ ...current, loading: true, error: undefined }));
 			try {
-				const payload = await fetchApi<T>(base, path, stableParams);
-				const data = unwrap(payload);
-				const updatedAt = Date.now();
-				writeCache(cacheKey, data, updatedAt);
+				const { data, updatedAt } = await requestWithDedupe<T>(
+					cacheKey,
+					base,
+					path,
+					stableParams,
+				);
 				setState({
 					data,
 					loading: false,
@@ -98,7 +130,15 @@ export function useApi<T>(
 
 	useEffect(() => {
 		if (!enabled || !autoRefresh) return;
-		const timer = window.setInterval(() => void load(true), CACHE_TTL);
+		const timer = window.setInterval(() => {
+			if (
+				document.visibilityState !== "visible" ||
+				(typeof navigator !== "undefined" && !navigator.onLine)
+			) {
+				return;
+			}
+			void load(true);
+		}, CACHE_TTL);
 		return () => window.clearInterval(timer);
 	}, [autoRefresh, enabled, load]);
 

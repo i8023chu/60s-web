@@ -28,7 +28,7 @@
 ## ❓ 为什么用
 
 - 一页聚合每日简报、全网热榜、天气、金价、油价、汇率和轻量工具。
-- 纯前端应用，无数据库，无自建后端，默认接入公开 60s API。
+- 纯前端应用，无数据库，无自建后端，API 地址由用户自行配置。
 - 设置保存在浏览器本地，支持城市、主题、壁纸、头像、收藏和自定义 API 地址。
 - 适合作为浏览器首页、PWA、个人服务器入口或家庭网络信息面板。
 
@@ -52,6 +52,12 @@ bun run build
 bun run preview
 ```
 
+## 🔌 API 配置
+
+- 默认不内置 API 地址，避免启动时消耗作者公共实例额度。
+- 首次打开会显示配置引导，可查看 [公共实例列表](https://docs.60s-api.viki.moe/7306811m0)，也可前往 [vikiboss/60s](https://github.com/vikiboss/60s) 自行部署。
+- 在应用内保存 API 地址后才会同步数据；输入过程不会触发请求，检测成功会自动保存。
+
 ## ⚡️ 部署
 
 <p align="center">
@@ -66,8 +72,6 @@ bun run preview
 这是一个 Vite 静态前端项目。执行 `bun run build` 后发布 `dist/` 即可，也可以使用仓库内置的 `Dockerfile`、`vercel.json` 或 `wrangler.jsonc` 部署到你喜欢的平台。
 
 完整部署说明见 [docs/deploy.md](./docs/deploy.md)，包含一键部署、Docker、Docker Compose、Nginx 和上线检查。
-
-默认 API 地址为 `https://60s.viki.moe/v2`。如需自托管 API，可在应用设置中替换。
 
 ## 🙏 致谢
 

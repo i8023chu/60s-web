@@ -116,6 +116,11 @@ export function WeatherCard({
 	const current = realtime.data?.weather;
 	const air = realtime.data?.air_quality;
 	const days = getUpcomingForecastDays(forecast.data?.daily_forecast);
+	const isIdle =
+		!realtime.loading &&
+		!realtime.error &&
+		realtime.data === undefined &&
+		!realtime.updatedAt;
 
 	return (
 		<article className={`card weather-card ${compact ? "home-weather" : ""}`}>
@@ -146,7 +151,7 @@ export function WeatherCard({
 						<span>°C</span>
 					</div>
 					<div className="weather-summary">
-						<b>{current?.condition || "读取中"}</b>
+						<b>{current?.condition || (isIdle ? "未配置 API" : "读取中")}</b>
 						<small>
 							{realtime.data?.location?.city ||
 								realtime.data?.location?.name ||

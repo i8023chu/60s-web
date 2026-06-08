@@ -1,6 +1,5 @@
 import { ExternalLink, Globe2, Newspaper, RefreshCw } from "lucide-react";
 import {
-	buildUrl,
 	type DailyNews,
 	DEFAULT_API_BASE,
 	toItems,
@@ -18,6 +17,7 @@ export function NewsPage({
 	apiBase: string;
 	daily: ApiState<DailyNews> & { reload: () => void };
 }) {
+	const apiReady = Boolean(apiBase.trim());
 	const markdownUrl = tryBuildUrl(apiBase, "/60s", { encoding: "markdown" });
 	return (
 		<section className="page-stack">
@@ -30,22 +30,31 @@ export function NewsPage({
 						Markdown <ExternalLink size={15} />
 					</a>
 				) : (
-					<span className="disabled-link">API 地址无效</span>
+					<span className="disabled-link">
+						{apiReady ? "API 地址无效" : "先配置 API"}
+					</span>
 				)}
 			</div>
 			<div className="news-page-grid">
 				<DailyCard state={daily} />
-				<NewsFeedCard apiBase={apiBase} title="AI 资讯快报" path="/ai-news" />
+				<NewsFeedCard
+					apiBase={apiBase}
+					title="AI 资讯快报"
+					path="/ai-news"
+					enabled={apiReady}
+				/>
 				<NewsFeedCard
 					apiBase={apiBase}
 					title="实时 IT 资讯"
 					path="/it-news"
 					params={{ limit: "16" }}
+					enabled={apiReady}
 				/>
 				<NewsFeedCard
 					apiBase={apiBase}
 					title="历史上的今天"
 					path="/today-in-history"
+					enabled={apiReady}
 				/>
 			</div>
 		</section>
@@ -57,15 +66,22 @@ function NewsFeedCard({
 	title,
 	path,
 	params,
+	enabled,
 }: {
 	apiBase: string;
 	title: string;
 	path: string;
 	params?: Record<string, string>;
+	enabled: boolean;
 }) {
-	const state = useApi<unknown>(apiBase, path, params || {}, true);
+	const state = useApi<unknown>(apiBase, path, params || {}, enabled);
 	const items = toItems(state.data).slice(0, 8);
 	const displayItems = state.loading ? skeletonItems(8) : items;
+	const isIdle =
+		!state.loading &&
+		!state.error &&
+		state.data === undefined &&
+		!state.updatedAt;
 	const isEmpty = !state.loading && !state.error && items.length === 0;
 	return (
 		<article className="card feed-card">
@@ -75,7 +91,14 @@ function NewsFeedCard({
 				right={<Status state={state} />}
 			/>
 			{isEmpty ? (
-				<EmptyState title="暂无资讯" desc="接口返回为空，稍后会随缓存自动刷新。" />
+				<EmptyState
+					title={isIdle ? "请先配置 API" : "暂无资讯"}
+					desc={
+						isIdle
+							? "填入 API 地址后，这里才会开始同步资讯。"
+							: "接口返回为空，可以稍后再打开或手动刷新。"
+					}
+				/>
 			) : (
 				<ol className="news-list">
 					{displayItems.map((item, index) => (
@@ -103,7 +126,13 @@ export function DailyCard({
 }) {
 	const news = state.data?.news ?? [];
 	const displayNews = state.loading ? skeletonLines(8) : news;
+	const isIdle =
+		!state.loading &&
+		!state.error &&
+		state.data === undefined &&
+		!state.updatedAt;
 	const isEmpty = !state.loading && !state.error && news.length === 0;
+	const fullTextUrl = state.data?.link || tryBuildUrl(DEFAULT_API_BASE, "/60s");
 	return (
 		<article id="news" className="card daily-card span-6">
 			<CardTitle
@@ -117,7 +146,14 @@ export function DailyCard({
 				<span>{state.data?.lunar_date}</span>
 			</div>
 			{isEmpty ? (
-				<EmptyState title="今日简报暂时为空" desc="上游接口已响应，但没有返回新闻条目。" />
+				<EmptyState
+					title={isIdle ? "请先配置 API" : "今日简报暂时为空"}
+					desc={
+						isIdle
+							? "填入 API 地址后，今日简报会自动同步。"
+							: "上游接口已响应，但没有返回新闻条目。"
+					}
+				/>
 			) : (
 				<ol className="news-list">
 					{displayNews.slice(0, 8).map((item, index) => (
@@ -131,15 +167,25 @@ export function DailyCard({
 				</ol>
 			)}
 			<div className="button-row">
-				<a
+				{fullTextUrl ? (
+					<a
+						className="outline-button"
+						href={fullTextUrl}
+						target="_blank"
+						rel="noreferrer"
+					>
+						<ExternalLink size={17} /> 查看全文
+					</a>
+				) : (
+					<button className="outline-button" disabled>
+						<ExternalLink size={17} /> 查看全文
+					</button>
+				)}
+				<button
 					className="outline-button"
-					href={state.data?.link || buildUrl(DEFAULT_API_BASE, "/60s")}
-					target="_blank"
-					rel="noreferrer"
+					onClick={state.reload}
+					disabled={isIdle}
 				>
-					<ExternalLink size={17} /> 查看全文
-				</a>
-				<button className="outline-button" onClick={state.reload}>
 					<RefreshCw size={17} /> 刷新
 				</button>
 			</div>

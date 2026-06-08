@@ -15,6 +15,7 @@ export function HotPage({
 }: {
 	apiBase: string;
 }) {
+	const apiReady = Boolean(apiBase.trim());
 	const hotBoards = [
 		{ title: "微博热搜", path: "/weibo" },
 		{ title: "知乎热榜", path: "/zhihu" },
@@ -41,6 +42,7 @@ export function HotPage({
 						title={board.title}
 						path={board.path}
 						params={board.params}
+						enabled={apiReady}
 					/>
 				))}
 			</div>
@@ -53,15 +55,22 @@ function HotMiniBoard({
 	title,
 	path,
 	params,
+	enabled,
 }: {
 	apiBase: string;
 	title: string;
 	path: string;
 	params?: Record<string, string>;
+	enabled: boolean;
 }) {
-	const state = useApi<unknown>(apiBase, path, params || {}, true);
+	const state = useApi<unknown>(apiBase, path, params || {}, enabled);
 	const items = toItems(state.data).slice(0, 8);
 	const displayItems = state.loading ? skeletonItems(8) : items;
+	const isIdle =
+		!state.loading &&
+		!state.error &&
+		state.data === undefined &&
+		!state.updatedAt;
 	const isEmpty = !state.loading && !state.error && items.length === 0;
 	return (
 		<article className="card mini-hot-card">
@@ -71,7 +80,14 @@ function HotMiniBoard({
 				right={<Status state={state} />}
 			/>
 			{isEmpty ? (
-				<EmptyState title="暂无热榜数据" desc="上游返回了空列表，稍后刷新即可。" />
+				<EmptyState
+					title={isIdle ? "请先配置 API" : "暂无热榜数据"}
+					desc={
+						isIdle
+							? "填入 API 地址后，这个榜单才会开始同步。"
+							: "上游返回了空列表，稍后刷新即可。"
+					}
+				/>
 			) : (
 				<ol className="rank-list compact-rank">
 					{displayItems.map((item, index) => {
@@ -117,6 +133,11 @@ export function HotBoard({
 	wide?: boolean;
 }) {
 	const displayItems = state.loading ? skeletonItems(10) : items;
+	const isIdle =
+		!state.loading &&
+		!state.error &&
+		state.data === undefined &&
+		!state.updatedAt;
 	const isEmpty = !state.loading && !state.error && items.length === 0;
 
 	return (
@@ -125,7 +146,11 @@ export function HotBoard({
 				icon={<Flame size={22} />}
 				title="全网热榜"
 				right={
-					<button className="ghost-button" onClick={state.reload}>
+					<button
+						className="ghost-button"
+						onClick={state.reload}
+						disabled={isIdle}
+					>
 						<RefreshCw size={16} /> 刷新缓存
 					</button>
 				}
@@ -143,8 +168,12 @@ export function HotBoard({
 			</div>
 			{isEmpty ? (
 				<EmptyState
-					title="暂无热榜数据"
-					desc="接口返回了空列表，不再假装加载中。可以手动刷新或切换榜单。"
+					title={isIdle ? "请先配置 API" : "暂无热榜数据"}
+					desc={
+						isIdle
+							? "填入 API 地址后，热榜会自动同步。"
+							: "接口返回了空列表，不再假装加载中。可以手动刷新或切换榜单。"
+					}
 				/>
 			) : (
 				<ol className="rank-list">

@@ -1,4 +1,10 @@
-import { LayoutGrid, Search } from "lucide-react";
+import {
+	ExternalLink,
+	KeyRound,
+	LayoutGrid,
+	Search,
+	X,
+} from "lucide-react";
 import {
 	useEffect,
 	useMemo,
@@ -14,6 +20,7 @@ import {
 	type FuelPrice,
 	type GoldPrice,
 	normalizeApiBase,
+	normalizeApiBaseInput,
 	toItems,
 	tryBuildUrl,
 	type WeatherForecast,
@@ -43,6 +50,8 @@ import {
 	categoryLabels,
 	chromeThemes,
 	colorThemes,
+	API_DOCS_URL,
+	API_REPO_URL,
 	defaultQuickFavorites,
 	hotTabs,
 	mobileNavModes,
@@ -95,11 +104,12 @@ const DEFAULT_SETTINGS_STATE: SettingsState = {
 	showWeather: true,
 	showHot: true,
 	showNews: true,
-	autoRefresh: true,
+	autoRefresh: false,
 };
 const DEFAULT_AVATAR_STATE: AvatarState = { mode: "default" };
 const DEFAULT_WALLPAPER_STATE: WallpaperState = { mode: "default" };
 const CONFIG_EXPORT_VERSION = 1;
+const LEGACY_DEFAULT_API_BASE = "https://60s.viki.moe/v2";
 
 type ConfigActionResult = {
 	ok: boolean;
@@ -187,6 +197,24 @@ function readEnum<T extends string>(
 	throw new Error(`${label} 配置值无效`);
 }
 
+function isLegacyDefaultApiBase(value: string) {
+	try {
+		return normalizeApiBase(value) === LEGACY_DEFAULT_API_BASE;
+	} catch {
+		return false;
+	}
+}
+
+function readInitialApiBase() {
+	const value = readStoredValue(STORAGE_KEYS.apiBase, DEFAULT_API_BASE);
+	if (isLegacyDefaultApiBase(value)) return DEFAULT_API_BASE;
+	try {
+		return value.trim() ? normalizeApiBaseInput(value) : DEFAULT_API_BASE;
+	} catch {
+		return value;
+	}
+}
+
 function hasStored60sSettings() {
 	if (typeof window === "undefined") return false;
 	return Object.keys(window.localStorage).some((key) =>
@@ -222,9 +250,12 @@ function parseImportedConfig(raw: string): ExportedSettings {
 	}
 
 	const config = parsed.settings;
-	const apiBase = normalizeApiBase(
-		readString(config.apiBase, DEFAULT_API_BASE),
-	);
+	const importedApiBase = readString(config.apiBase, DEFAULT_API_BASE).trim();
+	const apiBase = importedApiBase
+		? isLegacyDefaultApiBase(importedApiBase)
+			? DEFAULT_API_BASE
+			: normalizeApiBaseInput(importedApiBase)
+		: DEFAULT_API_BASE;
 	const wallpaperConfig = isRecord(config.wallpaper) ? config.wallpaper : {};
 	const wallpaperMode = readEnum(
 		wallpaperConfig.mode,
@@ -295,9 +326,7 @@ function parseImportedConfig(raw: string): ExportedSettings {
 }
 
 export function App() {
-	const [apiBase, setApiBase] = useState(() =>
-		readStoredValue(STORAGE_KEYS.apiBase, DEFAULT_API_BASE),
-	);
+	const [apiBase, setApiBase] = useState(readInitialApiBase);
 	const [city, setCity] = useState(() =>
 		readStoredValue(STORAGE_KEYS.city, DEFAULT_CITY),
 	);
@@ -360,75 +389,82 @@ export function App() {
 	const [showInstallHint, setShowInstallHint] = useState(false);
 	const [isStandalone, setIsStandalone] = useState(isStandaloneDisplay);
 	const [bottomNavHidden, setBottomNavHidden] = useState(false);
+	const [showApiGuide, setShowApiGuide] = useState(() => {
+		if (typeof window === "undefined") return false;
+		const dismissed =
+			readStoredValue(STORAGE_KEYS.apiGuideDismissed, "false") === "true";
+		return !dismissed && !apiBase.trim();
+	});
+	const hasApiBase = Boolean(apiBase.trim());
 
 	const daily = useApi<DailyNews>(
 		apiBase,
 		"/60s",
 		{},
-		settings.showNews,
+		settings.showNews && hasApiBase,
 		settings.autoRefresh,
 	);
 	const weather = useApi<WeatherRealtime>(
 		apiBase,
 		"/weather/realtime",
 		{ query: city },
-		settings.showWeather,
+		settings.showWeather && hasApiBase,
 		settings.autoRefresh,
 	);
 	const forecast = useApi<WeatherForecast>(
 		apiBase,
 		"/weather/forecast",
 		{ query: city, days: "7" },
-		settings.showWeather,
+		settings.showWeather && hasApiBase,
 		settings.autoRefresh,
 	);
 	const hot = useApi<unknown>(
 		apiBase,
 		hotTab.path,
 		{},
-		settings.showHot,
+		settings.showHot && hasApiBase,
 		settings.autoRefresh,
 	);
 	const gold = useApi<GoldPrice>(
 		apiBase,
 		"/gold-price",
 		{},
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 	const fuel = useApi<FuelPrice>(
 		apiBase,
 		"/fuel-price",
 		{ region: city },
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 	const exchange = useApi<ExchangeRate>(
 		apiBase,
 		"/exchange-rate",
 		{ currency: "CNY" },
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 	const epic = useApi<EpicGame[]>(
 		apiBase,
 		"/epic",
 		{},
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 	const maoyan = useApi<unknown>(
 		apiBase,
 		"/maoyan/realtime/movie",
 		{},
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 	const hitokoto = useApi<unknown>(
 		apiBase,
 		"/hitokoto",
 		{},
-		true,
+		hasApiBase,
 		settings.autoRefresh,
 	);
 
@@ -458,6 +494,17 @@ export function App() {
 
 	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.apiBase, apiBase);
+	}, [apiBase]);
+
+	useEffect(() => {
+		if (!apiBase.trim()) return;
+		try {
+			normalizeApiBase(apiBase);
+			setShowApiGuide(false);
+			writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
+		} catch {
+			// Keep the guide available until the saved API address is valid.
+		}
 	}, [apiBase]);
 
 	useEffect(() => {
@@ -634,6 +681,7 @@ export function App() {
 			endpointFavorites: [],
 			quickFavorites: defaultQuickFavorites,
 		});
+		setShowApiGuide(true);
 		return { ok: true, message: "已恢复默认设置，并清理本地缓存。" };
 	};
 
@@ -695,17 +743,9 @@ export function App() {
 		return () => window.removeEventListener("scroll", handleScroll);
 	}, [resolvedMobileNav]);
 
-	const reloadAll = () => {
-		daily.reload();
-		weather.reload();
-		forecast.reload();
-		hot.reload();
-		gold.reload();
-		fuel.reload();
-		exchange.reload();
-		epic.reload();
-		maoyan.reload();
-		hitokoto.reload();
+	const dismissApiGuide = () => {
+		setShowApiGuide(false);
+		writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
 	};
 
 	const runSearch = () => {
@@ -798,6 +838,9 @@ export function App() {
 						onAction={runQuickAction}
 						onManage={() => setActivePage("settings")}
 					/>
+					{!hasApiBase && (
+						<ApiSetupBanner onOpen={() => setShowApiGuide(true)} />
+					)}
 					{searchMatches.length > 0 && (
 						<SearchResults base={apiBase} matches={searchMatches} />
 					)}
@@ -806,6 +849,7 @@ export function App() {
 				{activePage === "home" && (
 					<HomePage
 						apiBase={apiBase}
+						apiReady={hasApiBase}
 						setApiBase={setApiBase}
 						city={city}
 						setCity={setCity}
@@ -897,6 +941,126 @@ export function App() {
 					hidden={bottomNavHidden}
 				/>
 			)}
+			{showApiGuide && (
+				<ApiSetupGuide
+					initialApiBase={apiBase}
+					onDismiss={dismissApiGuide}
+					onSave={(value) => {
+						setApiBase(value);
+						setShowApiGuide(false);
+						writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
+					}}
+				/>
+			)}
+		</div>
+	);
+}
+
+function ApiSetupBanner({ onOpen }: { onOpen: () => void }) {
+	return (
+		<div className="api-setup-banner" role="status">
+			<span>
+				<KeyRound size={20} />
+				<span>
+					<b>未配置 API</b>
+					<small>为减少公共实例压力，请选择公共实例或自行部署后填入地址。</small>
+				</span>
+			</span>
+			<div>
+				<a href={API_DOCS_URL} target="_blank" rel="noreferrer">
+					公共实例 <ExternalLink size={15} />
+				</a>
+				<button type="button" onClick={onOpen}>
+					填入 API
+				</button>
+			</div>
+		</div>
+	);
+}
+
+function ApiSetupGuide({
+	initialApiBase,
+	onDismiss,
+	onSave,
+}: {
+	initialApiBase: string;
+	onDismiss: () => void;
+	onSave: (value: string) => void;
+}) {
+	const [draft, setDraft] = useState(initialApiBase);
+	const [error, setError] = useState("");
+
+	const save = () => {
+		try {
+			const value = normalizeApiBaseInput(draft);
+			onSave(value);
+		} catch (saveError) {
+			setError(
+				saveError instanceof Error ? saveError.message : "API 地址无效",
+			);
+		}
+	};
+
+	return (
+		<div className="api-guide-overlay" role="presentation">
+			<div
+				className="api-guide-dialog"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="api-guide-title"
+			>
+				<button
+					type="button"
+					className="api-guide-close"
+					aria-label="关闭 API 配置引导"
+					onClick={onDismiss}
+				>
+					<X size={18} />
+				</button>
+				<div className="api-guide-head">
+					<KeyRound size={24} />
+					<span>
+						<b id="api-guide-title">配置 60s API</b>
+						<small>默认不再内置公共域名，避免启动时消耗作者实例额度。</small>
+					</span>
+				</div>
+				<div className="api-guide-copy">
+					<p>打开公共实例列表，选择可用域名或自行部署，然后把 API 基础地址填到这里。</p>
+					<div className="api-guide-links">
+						<a href={API_REPO_URL} target="_blank" rel="noreferrer">
+							自行部署 <ExternalLink size={15} />
+						</a>
+						<a href={API_DOCS_URL} target="_blank" rel="noreferrer">
+							查看公共实例列表 <ExternalLink size={15} />
+						</a>
+					</div>
+				</div>
+				<label className="api-guide-field">
+					<span>API 基础地址</span>
+					<input
+						value={draft}
+						onChange={(event) => {
+							setDraft(event.target.value);
+							setError("");
+						}}
+						placeholder="https://example.com/v2"
+						autoFocus
+					/>
+				</label>
+				{error && (
+					<p className="api-guide-error" role="alert">
+						{error}
+					</p>
+				)}
+				<div className="api-guide-actions">
+					<button type="button" className="outline-button" onClick={onDismiss}>
+						稍后再说
+					</button>
+					<button type="button" className="primary-subtle" onClick={save}>
+						保存 API
+					</button>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -952,6 +1116,7 @@ function SearchResults({
 	base: string;
 	matches: EndpointDefinition[];
 }) {
+	const hasApiBase = Boolean(base.trim());
 	return (
 		<div className="search-results">
 			{matches.map((endpoint) => {
@@ -964,7 +1129,7 @@ function SearchResults({
 				) : (
 					<span className="disabled-result" key={endpoint.id}>
 						<span>{endpoint.name}</span>
-						<small>API 地址无效</small>
+						<small>{hasApiBase ? "API 地址无效" : "先配置 API"}</small>
 					</span>
 				);
 			})}
