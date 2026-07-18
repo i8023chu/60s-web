@@ -1,4 +1,5 @@
 import {
+	Menu,
 	Moon,
 	RotateCcw,
 	Save,
@@ -29,11 +30,24 @@ export function Header({
 	setColorTheme: (theme: ColorTheme) => void;
 }) {
 	const [avatarOpen, setAvatarOpen] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
 	const [qqInput, setQqInput] = useState(avatar.qq || "");
 	const [avatarNotice, setAvatarNotice] = useState("");
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const avatarWrapRef = useRef<HTMLDivElement | null>(null);
+	const menuWrapRef = useRef<HTMLDivElement | null>(null);
 	const avatarSrc = getAvatarSrc(avatar);
+	const mainNav = nav.filter((item) => item.id !== "settings");
+	const mobileMenuNav = nav;
+
+	const navigateTo = (page: PageId) => {
+		setActivePage(page);
+		setMenuOpen(false);
+		setAvatarOpen(false);
+		window.requestAnimationFrame(() => {
+			window.scrollTo({ top: 0, behavior: "auto" });
+		});
+	};
 
 	const handleAvatarFile = (file?: File) => {
 		if (!file) return;
@@ -102,6 +116,29 @@ export function Header({
 		};
 	}, [avatarOpen]);
 
+	useEffect(() => {
+		if (!menuOpen) return;
+		const onPointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			if (
+				target instanceof Node &&
+				menuWrapRef.current &&
+				!menuWrapRef.current.contains(target)
+			) {
+				setMenuOpen(false);
+			}
+		};
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setMenuOpen(false);
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("pointerdown", onPointerDown);
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [menuOpen]);
+
 	return (
 		<header className="topbar">
 			<button
@@ -110,29 +147,60 @@ export function Header({
 				aria-label="60s 信息聚合首页"
 			>
 				<img src="/favicon.png" alt="60s logo" width={24} height={24} />
-				<strong>60s 信息聚合</strong>
+				<span className="brand-copy">
+					<strong>60s</strong>
+					<small>信息聚合</small>
+				</span>
 			</button>
 			<nav>
-				{nav.map((item) => {
-					const Icon = item.icon;
-					return (
-						<button
-							key={item.id}
-							className={activePage === item.id ? "active" : ""}
-							onClick={() => setActivePage(item.id)}
-						>
-							<Icon size={19} />
-							<span className="nav-label">{item.label}</span>
-						</button>
-					);
-				})}
+				{mainNav.map((item) => (
+					<button
+						key={item.id}
+						className={activePage === item.id ? "active" : ""}
+						onClick={() => navigateTo(item.id)}
+					>
+						<span className="nav-label">{item.label}</span>
+					</button>
+				))}
 			</nav>
 			<div className="header-actions">
+				<div className="mobile-menu-wrap" ref={menuWrapRef}>
+					<button
+						className="mobile-menu-toggle"
+						type="button"
+						aria-label="打开导航"
+						aria-expanded={menuOpen}
+						onClick={() => setMenuOpen((open) => !open)}
+					>
+						<Menu size={18} />
+					</button>
+					{menuOpen && (
+						<div className="mobile-menu-popover" role="menu">
+							{mobileMenuNav.map((item) => {
+								const active = activePage === item.id;
+								return (
+									<button
+										key={item.id}
+										type="button"
+										role="menuitem"
+										className={active ? "active" : ""}
+										aria-current={active ? "page" : undefined}
+										onClick={() => navigateTo(item.id)}
+									>
+										{item.label}
+									</button>
+								);
+							})}
+						</div>
+					)}
+				</div>
 				<button
-					className="settings-shortcut"
+					className={`settings-shortcut ${
+						activePage === "settings" ? "active" : ""
+					}`}
 					type="button"
 					aria-label="打开设置"
-					onClick={() => setActivePage("settings")}
+					onClick={() => navigateTo("settings")}
 				>
 					<Settings size={18} />
 				</button>
@@ -164,7 +232,7 @@ export function Header({
 						<div className="avatar-popover">
 							<div className="avatar-popover-head">
 								<span>
-									<UserRound size={18} /> 自定义头像
+									<UserRound size={18} /> 个人
 								</span>
 								<button
 									type="button"
@@ -174,15 +242,39 @@ export function Header({
 									<X size={16} />
 								</button>
 							</div>
-							<div className="avatar-preview">
-								<img src={avatarSrc} alt="" />
-								<small>
-									{avatar.mode === "qq"
-										? `QQ ${avatar.qq}`
-										: avatar.mode === "upload"
-											? "本地头像"
-											: "默认头像"}
-								</small>
+							<div className="avatar-menu-actions">
+								<button type="button" onClick={() => navigateTo("settings")}>
+									<Settings size={15} /> 设置
+								</button>
+								<button
+									type="button"
+									onClick={() =>
+										setColorTheme(colorTheme === "dark" ? "light" : "dark")
+									}
+								>
+									{colorTheme === "dark" ? (
+										<Moon size={15} />
+									) : (
+										<Sun size={15} />
+									)}
+									{colorTheme === "dark" ? "浅色" : "暗色"}
+								</button>
+								<button
+									type="button"
+									onClick={() => fileInputRef.current?.click()}
+								>
+									<Upload size={15} /> 上传
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										setAvatar({ mode: "default" });
+										setAvatarNotice("");
+										setAvatarOpen(false);
+									}}
+								>
+									<RotateCcw size={15} /> 默认
+								</button>
 							</div>
 							<input
 								ref={fileInputRef}
@@ -191,15 +283,8 @@ export function Header({
 								hidden
 								onChange={(event) => handleAvatarFile(event.target.files?.[0])}
 							/>
-							<button
-								className="avatar-action"
-								type="button"
-								onClick={() => fileInputRef.current?.click()}
-							>
-								<Upload size={16} /> 上传本地图片
-							</button>
 							<label className="qq-avatar-field">
-								<span>QQ 头像缓存</span>
+								<span>QQ 头像</span>
 								<div>
 									<input
 										value={qqInput}
@@ -217,17 +302,6 @@ export function Header({
 									{avatarNotice}
 								</p>
 							)}
-							<button
-								className="avatar-action subtle"
-								type="button"
-								onClick={() => {
-									setAvatar({ mode: "default" });
-									setAvatarNotice("");
-									setAvatarOpen(false);
-								}}
-							>
-								<RotateCcw size={16} /> 恢复默认
-							</button>
 						</div>
 					)}
 				</div>

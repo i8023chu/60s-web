@@ -45,8 +45,8 @@ export const homeCardRegistry: Record<HomeCardId, HomeCardDefinition> = {
 	},
 	entertainmentTools: {
 		id: "entertainmentTools",
-		label: "娱乐与工具",
-		description: "影视娱乐信息与常用工具快捷入口",
+		label: "影视娱乐",
+		description: "票房与限免游戏等轻量娱乐信息",
 	},
 	quote: {
 		id: "quote",

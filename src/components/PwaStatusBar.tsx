@@ -1,24 +1,18 @@
 import {
-	Download,
 	RefreshCw,
 	WifiOff,
-	X,
 } from "lucide-react";
 
 export function PwaStatusBar({
 	isOffline,
 	updateReady,
-	showInstallHint,
 	onApplyUpdate,
-	onDismissInstallHint,
 }: {
 	isOffline: boolean;
 	updateReady: boolean;
-	showInstallHint: boolean;
 	onApplyUpdate: () => void;
-	onDismissInstallHint: () => void;
 }) {
-	if (!isOffline && !updateReady && !showInstallHint) return null;
+	if (!isOffline && !updateReady) return null;
 
 	return (
 		<div className="pwa-status-stack" aria-live="polite">
@@ -26,11 +20,16 @@ export function PwaStatusBar({
 				<div className="pwa-status-strip update" role="status">
 					<span>
 						<RefreshCw size={17} />
-						<b>发现新版本</b>
-						<small>刷新后即可使用最新内容</small>
+						<b>新版本可用</b>
 					</span>
-					<button type="button" onClick={onApplyUpdate}>
-						刷新
+					<button
+						type="button"
+						className="icon-only"
+						aria-label="刷新使用最新内容"
+						title="刷新"
+						onClick={onApplyUpdate}
+					>
+						<RefreshCw size={15} />
 					</button>
 				</div>
 			)}
@@ -41,23 +40,6 @@ export function PwaStatusBar({
 						<b>离线模式</b>
 						<small>页面壳可继续打开，实时数据会在联网后恢复</small>
 					</span>
-				</div>
-			)}
-			{showInstallHint && (
-				<div className="pwa-status-strip install" role="status">
-					<span>
-						<Download size={17} />
-						<b>添加到主屏幕</b>
-						<small>在 Safari 中点分享，再选择添加到主屏幕</small>
-					</span>
-					<button
-						type="button"
-						className="icon-only"
-						aria-label="关闭安装提示"
-						onClick={onDismissInstallHint}
-					>
-						<X size={16} />
-					</button>
 				</div>
 			)}
 		</div>

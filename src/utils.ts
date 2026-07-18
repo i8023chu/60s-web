@@ -5,7 +5,9 @@ import type {
 	HotItem,
 	WeatherForecast,
 } from "./api";
+import { accentThemes } from "./config";
 import type {
+	AccentThemeState,
 	AvatarState,
 	ColorTheme,
 	SearchProviderId,
@@ -124,14 +126,40 @@ export function getWallpaperStyle(
 ): CSSProperties {
 	const dark = colorTheme === "dark";
 	if (wallpaper.mode === "custom" && wallpaper.src) {
+		const imageOpacity = clampCssNumber(wallpaper.imageOpacity, dark ? 0.58 : 0.78);
+		const overlayOpacity = clampCssNumber(wallpaper.overlayOpacity, dark ? 0.64 : 0.48);
+		const chromeOpacity = clampCssNumber(wallpaper.chromeOpacity, dark ? 0.72 : 0.68);
+		const surfaceOpacity = clampCssNumber(wallpaper.surfaceOpacity, dark ? 0.74 : 0.72);
+		const blur = Math.min(Math.max(wallpaper.blur ?? 0, 0), 12);
+		const overlayRgb = dark ? "7, 16, 15" : "246, 248, 248";
+		const navRgb = dark ? "12, 25, 23" : "255, 255, 255";
+		const surfaceRgb = dark ? "14, 29, 27" : "255, 255, 255";
+		const lineRgb = dark ? "240, 246, 252" : "31, 35, 40";
 		return {
-			backgroundImage: dark
-				? `linear-gradient(180deg, rgba(7, 16, 15, 0.78), rgba(7, 16, 15, 0.9)), url("${wallpaper.src}")`
-				: `linear-gradient(180deg, rgba(246, 248, 248, 0.84), rgba(246, 248, 248, 0.9)), url("${wallpaper.src}")`,
-			backgroundSize: "cover",
-			backgroundPosition: "center",
-			backgroundAttachment: "fixed",
-		};
+			"--wallpaper-image": `url("${wallpaper.src}")`,
+			"--wallpaper-image-opacity": String(imageOpacity),
+			"--wallpaper-image-blur": `${blur}px`,
+			"--wallpaper-overlay": `rgba(${overlayRgb}, ${overlayOpacity})`,
+			"--app-bg": "transparent",
+			"--canvas": "transparent",
+			"--nav-bg": `rgba(${navRgb}, ${chromeOpacity})`,
+			"--surface": `rgba(${surfaceRgb}, ${surfaceOpacity})`,
+			"--surface-strong": `rgba(${surfaceRgb}, ${Math.min(
+				surfaceOpacity + 0.14,
+				dark ? 0.9 : 0.94,
+			)})`,
+			"--surface-soft": `rgba(${surfaceRgb}, ${Math.min(
+				surfaceOpacity + 0.02,
+				dark ? 0.82 : 0.84,
+			)})`,
+			"--input-bg": `rgba(${surfaceRgb}, ${Math.min(
+				surfaceOpacity + 0.16,
+				dark ? 0.92 : 0.95,
+			)})`,
+			"--line": `rgba(${lineRgb}, ${dark ? 0.18 : 0.16})`,
+			"--line-strong": `rgba(${lineRgb}, ${dark ? 0.26 : 0.22})`,
+			background: "transparent",
+		} as CSSProperties;
 	}
 	if (wallpaper.mode === "mint") {
 		return {
@@ -158,6 +186,69 @@ export function getWallpaperStyle(
 		};
 	}
 	return {};
+}
+
+function clampCssNumber(value: number | undefined, fallback: number) {
+	if (typeof value !== "number" || Number.isNaN(value)) return fallback;
+	return Math.min(Math.max(value, 0), 1);
+}
+
+function normalizeHexColor(value?: string) {
+	if (!value) return "";
+	const clean = value.trim();
+	if (/^#[0-9a-f]{6}$/i.test(clean)) return clean.toLowerCase();
+	if (/^[0-9a-f]{6}$/i.test(clean)) return `#${clean.toLowerCase()}`;
+	return "";
+}
+
+function hexToRgb(hex: string) {
+	const clean = normalizeHexColor(hex) || "#0f8f7f";
+	const value = Number.parseInt(clean.slice(1), 16);
+	return {
+		r: (value >> 16) & 255,
+		g: (value >> 8) & 255,
+		b: value & 255,
+	};
+}
+
+function mixHex(hex: string, target: "#000000" | "#ffffff", weight: number) {
+	const base = hexToRgb(hex);
+	const mix = hexToRgb(target);
+	const ratio = Math.min(Math.max(weight, 0), 1);
+	const channel = (from: number, to: number) =>
+		Math.round(from * (1 - ratio) + to * ratio);
+	return `#${[channel(base.r, mix.r), channel(base.g, mix.g), channel(base.b, mix.b)]
+		.map((part) => part.toString(16).padStart(2, "0"))
+		.join("")}`;
+}
+
+export function getAccentStyle(accentTheme: AccentThemeState): CSSProperties {
+	const preset = accentThemes.find((theme) => theme.id === accentTheme.mode);
+	const primary =
+		accentTheme.mode === "custom"
+			? normalizeHexColor(accentTheme.color) || accentThemes[0].primary
+			: preset?.primary || accentThemes[0].primary;
+	const dark =
+		accentTheme.mode === "custom"
+			? mixHex(primary, "#000000", 0.2)
+			: preset?.dark || mixHex(primary, "#000000", 0.2);
+	const secondary =
+		accentTheme.mode === "custom"
+			? mixHex(primary, "#ffffff", 0.18)
+			: preset?.secondary || mixHex(primary, "#ffffff", 0.18);
+	const warm = preset?.warm || "#ff7a45";
+	const { r, g, b } = hexToRgb(primary);
+
+	return {
+		"--accent": primary,
+		"--accent-dark": dark,
+		"--accent-teal": secondary,
+		"--accent-warm": warm,
+		"--surface-tint": `rgba(${r}, ${g}, ${b}, 0.12)`,
+		"--accent-soft": `rgba(${r}, ${g}, ${b}, 0.08)`,
+		"--accent-border": `rgba(${r}, ${g}, ${b}, 0.32)`,
+		"--accent-focus": `rgba(${r}, ${g}, ${b}, 0.1)`,
+	} as CSSProperties;
 }
 
 export function readCurrencyRate(data: ExchangeRate | undefined, code: string) {

@@ -21,6 +21,8 @@ import type { EndpointDefinition } from "./api";
 import type {
 	ChromeTheme,
 	ColorTheme,
+	AccentThemeMode,
+	HotBoardId,
 	MobileNavMode,
 	QuickActionDefinition,
 	QuickFavoriteId,
@@ -29,23 +31,24 @@ import type {
 	WallpaperMode,
 } from "./types";
 
-export const CACHE_TTL = 10 * 60 * 1000;
+export const CACHE_TTL = 60 * 60 * 1000;
 
 export const STORAGE_KEYS = {
 	apiBase: "60s-web:api-base",
 	city: "60s-web:city",
+	activePage: "60s-web:active-page",
 	settings: "60s-web:settings",
 	avatar: "60s-web:avatar",
 	searchProvider: "60s-web:search-provider",
 	wallpaper: "60s-web:wallpaper",
 	chromeTheme: "60s-web:chrome-theme",
 	colorTheme: "60s-web:color-theme",
+	accentTheme: "60s-web:accent-theme",
 	mobileNavMode: "60s-web:mobile-nav-mode",
-	iosInstallHintDismissed: "60s-web:ios-install-hint-dismissed",
-	apiGuideDismissed: "60s-web:api-guide-dismissed",
 	homeCardLayout: "60s-web:home-card-layout",
 	endpointFavorites: "60s-web:endpoint-favorites",
 	quickFavorites: "60s-web:quick-favorites",
+	hotBoardPreferences: "60s-web:hot-board-preferences",
 } as const;
 
 export const nav = [
@@ -63,6 +66,29 @@ export const hotTabs = [
 	{ id: "bili", label: "B站", path: "/bili" },
 	{ id: "douyin", label: "抖音", path: "/douyin" },
 	{ id: "toutiao", label: "头条", path: "/toutiao" },
+] as const;
+
+export const hotBoards: Array<{
+	id: HotBoardId;
+	title: string;
+	path: string;
+	params?: Record<string, string>;
+}> = [
+	{ id: "weibo", title: "微博热搜", path: "/weibo" },
+	{ id: "zhihu", title: "知乎热榜", path: "/zhihu" },
+	{ id: "bili", title: "B站热榜", path: "/bili" },
+	{ id: "douyin", title: "抖音热搜", path: "/douyin" },
+	{ id: "toutiao", title: "头条热榜", path: "/toutiao" },
+	{ id: "baidu", title: "百度热搜", path: "/baidu/hot" },
+	{ id: "rednote", title: "小红书热点", path: "/rednote" },
+	{ id: "hacker-news", title: "Hacker News", path: "/hacker-news/top", params: { limit: "12" } },
+];
+
+export const defaultHotBoardPreferences: HotBoardId[] = [
+	"weibo",
+	"zhihu",
+	"bili",
+	"douyin",
 ];
 
 export const defaultQuickFavorites: QuickFavoriteId[] = [
@@ -162,7 +188,6 @@ export const searchProviders: Array<{
 	label: string;
 	sub: string;
 }> = [
-	{ id: "site", label: "站内", sub: "接口" },
 	{ id: "bing", label: "Bing", sub: "网页" },
 	{ id: "google", label: "Google", sub: "网页" },
 	{ id: "chatgpt", label: "ChatGPT", sub: "问答" },
@@ -186,9 +211,9 @@ export const chromeThemes: Array<{
 	label: string;
 	sub: string;
 }> = [
-	{ id: "classic", label: "经典", sub: "固定栏" },
-	{ id: "floating", label: "悬浮", sub: "浮层卡片" },
-	{ id: "minimal", label: "极简", sub: "轻边界" },
+	{ id: "classic", label: "经典", sub: "标准顶栏" },
+	{ id: "floating", label: "悬浮", sub: "悬浮胶囊" },
+	{ id: "single", label: "单页", sub: "隐藏导航" },
 ];
 
 export const colorThemes: Array<{
@@ -198,6 +223,53 @@ export const colorThemes: Array<{
 }> = [
 	{ id: "light", label: "浅色", sub: "清爽白昼" },
 	{ id: "dark", label: "暗色", sub: "夜间低亮" },
+];
+
+export const accentThemes: Array<{
+	id: Exclude<AccentThemeMode, "custom">;
+	label: string;
+	sub: string;
+	primary: string;
+	dark: string;
+	secondary: string;
+	warm: string;
+}> = [
+	{
+		id: "green",
+		label: "松绿",
+		sub: "默认耐看",
+		primary: "#0f8f7f",
+		dark: "#08776d",
+		secondary: "#14b8a6",
+		warm: "#ff7a45",
+	},
+	{
+		id: "blue",
+		label: "仓蓝",
+		sub: "清晰理性",
+		primary: "#0969da",
+		dark: "#0550ae",
+		secondary: "#12a594",
+		warm: "#ff8a3d",
+	},
+	{
+		id: "coral",
+		label: "珊瑚",
+		sub: "温暖醒目",
+		primary: "#e85d3f",
+		dark: "#c6432e",
+		secondary: "#0ea5a4",
+		warm: "#ff9f1c",
+	},
+	{
+		id: "violet",
+		label: "藤紫",
+		sub: "轻巧特别",
+		primary: "#7657d6",
+		dark: "#6046b6",
+		secondary: "#0f9f8f",
+		warm: "#f97316",
+	},
 ];
 
 export const mobileNavModes: Array<{

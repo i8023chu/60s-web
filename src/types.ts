@@ -8,6 +8,7 @@ export type ApiState<T> = {
 };
 
 export type SettingsState = {
+	showSearch: boolean;
 	showWeather: boolean;
 	showHot: boolean;
 	showNews: boolean;
@@ -16,8 +17,17 @@ export type SettingsState = {
 
 export type PageId = "home" | "hot" | "news" | "weather" | "tools" | "settings";
 export type ToolId = "translate" | "qrcode" | "password" | "palette";
-export type SearchProviderId = "site" | "bing" | "google" | "chatgpt" | "doubao";
+export type SearchProviderId = "bing" | "google" | "chatgpt" | "doubao";
 export type EndpointFavoriteId = string;
+export type HotBoardId =
+	| "weibo"
+	| "zhihu"
+	| "bili"
+	| "douyin"
+	| "toutiao"
+	| "baidu"
+	| "rednote"
+	| "hacker-news";
 export type QuickFavoriteId =
 	| "daily"
 	| "hot-weibo"
@@ -31,8 +41,9 @@ export type QuickFavoriteId =
 	| "tool-password"
 	| "tool-palette";
 export type WallpaperMode = "default" | "mint" | "paper" | "dawn" | "custom";
-export type ChromeTheme = "classic" | "floating" | "minimal";
+export type ChromeTheme = "classic" | "floating" | "single";
 export type ColorTheme = "light" | "dark";
+export type AccentThemeMode = "green" | "blue" | "coral" | "violet" | "custom";
 export type MobileNavMode = "auto" | "bottom" | "top";
 
 export type AvatarState = {
@@ -45,7 +56,17 @@ export type AvatarState = {
 export type WallpaperState = {
 	mode: WallpaperMode;
 	src?: string;
+	imageOpacity?: number;
+	overlayOpacity?: number;
+	chromeOpacity?: number;
+	surfaceOpacity?: number;
+	blur?: number;
 	updatedAt?: number;
+};
+
+export type AccentThemeState = {
+	mode: AccentThemeMode;
+	color?: string;
 };
 
 export type ToolDefinition = {

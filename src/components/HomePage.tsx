@@ -22,8 +22,8 @@ import {
 	type HomeCardId,
 	type HomeCardLayout,
 } from "../cards";
-import { hotTabs } from "../config";
-import type { ApiState, PageId, SettingsState, ToolId } from "../types";
+import { hotTabs as allHotTabs } from "../config";
+import type { ApiState, SettingsState } from "../types";
 import {
 	useState,
 	type MouseEvent as ReactMouseEvent,
@@ -33,29 +33,25 @@ import {
 	EntertainmentCard,
 	MarketStrip,
 	QuoteCard,
-	ToolShortcuts,
 } from "./HomeCards";
 import { HotBoard } from "./Hot";
 import { DailyCard } from "./News";
-import { HomeModuleSettings } from "./SettingsPanel";
 import { WeatherCard } from "./Weather";
 
 type HomePageProps = {
-	apiBase: string;
 	apiReady: boolean;
-	setApiBase: (value: string) => void;
 	city: string;
 	setCity: (city: string) => void;
 	settings: SettingsState;
-	setSettings: (value: SettingsState) => void;
 	daily: ApiState<DailyNews> & { reload: () => void };
 	weather: ApiState<WeatherRealtime> & { reload: () => void };
 	forecast: ApiState<WeatherForecast> & { reload: () => void };
 	gold: ApiState<GoldPrice> & { reload: () => void };
 	fuel: ApiState<FuelPrice> & { reload: () => void };
 	exchange: ApiState<ExchangeRate> & { reload: () => void };
-	hotTab: (typeof hotTabs)[number];
-	setHotTab: (tab: (typeof hotTabs)[number]) => void;
+	hotTab: (typeof allHotTabs)[number];
+	setHotTab: (tab: (typeof allHotTabs)[number]) => void;
+	hotTabs: Array<(typeof allHotTabs)[number]>;
 	hot: ApiState<unknown> & { reload: () => void };
 	hotItems: HotItem[];
 	epic: ApiState<EpicGame[]>;
@@ -63,18 +59,13 @@ type HomePageProps = {
 	hitokoto?: unknown;
 	homeCardLayout: HomeCardLayout;
 	setHomeCardLayout: (layout: HomeCardLayout) => void;
-	setActivePage: (page: PageId) => void;
-	setActiveTool: (tool: ToolId) => void;
 };
 
 export function HomePage({
-	apiBase,
 	apiReady,
-	setApiBase,
 	city,
 	setCity,
 	settings,
-	setSettings,
 	daily,
 	weather,
 	forecast,
@@ -83,6 +74,7 @@ export function HomePage({
 	exchange,
 	hotTab,
 	setHotTab,
+	hotTabs,
 	hot,
 	hotItems,
 	epic,
@@ -90,8 +82,6 @@ export function HomePage({
 	hitokoto,
 	homeCardLayout,
 	setHomeCardLayout,
-	setActivePage,
-	setActiveTool,
 }: HomePageProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [draggedCard, setDraggedCard] = useState<{
@@ -314,18 +304,11 @@ export function HomePage({
 		}
 		if (cardId === "entertainmentTools") {
 			return (
-				<div className="home-right-split">
-					<EntertainmentCard
-						epic={epic}
-						movies={movieItems}
-						apiReady={apiReady}
-					/>
-					<ToolShortcuts
-						apiBase={apiBase}
-						setActivePage={setActivePage}
-						setActiveTool={setActiveTool}
-					/>
-				</div>
+				<EntertainmentCard
+					epic={epic}
+					movies={movieItems}
+					apiReady={apiReady}
+				/>
 			);
 		}
 		return <QuoteCard data={hitokoto} />;
@@ -407,16 +390,6 @@ export function HomePage({
 						</div>
 					);
 				})}
-				{column === "left" && (
-					<HomeModuleSettings
-						apiBase={apiBase}
-						setApiBase={setApiBase}
-						city={city}
-						setCity={setCity}
-						settings={settings}
-						setSettings={setSettings}
-					/>
-				)}
 				<div
 					className={`home-drop-zone ${
 						dropTarget?.column === column && dropTarget.index === endIndex

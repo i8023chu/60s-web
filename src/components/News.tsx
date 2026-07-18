@@ -1,4 +1,4 @@
-import { ExternalLink, Globe2, Newspaper, RefreshCw } from "lucide-react";
+import { ExternalLink, Globe2, Newspaper } from "lucide-react";
 import {
 	type DailyNews,
 	DEFAULT_API_BASE,
@@ -18,23 +18,8 @@ export function NewsPage({
 	daily: ApiState<DailyNews> & { reload: () => void };
 }) {
 	const apiReady = Boolean(apiBase.trim());
-	const markdownUrl = tryBuildUrl(apiBase, "/60s", { encoding: "markdown" });
 	return (
 		<section className="page-stack">
-			<div className="page-title">
-				<span>
-					<Newspaper size={24} /> 新闻资讯
-				</span>
-				{markdownUrl ? (
-					<a href={markdownUrl} target="_blank" rel="noreferrer">
-						Markdown <ExternalLink size={15} />
-					</a>
-				) : (
-					<span className="disabled-link">
-						{apiReady ? "API 地址无效" : "先配置 API"}
-					</span>
-				)}
-			</div>
 			<div className="news-page-grid">
 				<DailyCard state={daily} />
 				<NewsFeedCard
@@ -92,12 +77,8 @@ function NewsFeedCard({
 			/>
 			{isEmpty ? (
 				<EmptyState
-					title={isIdle ? "请先配置 API" : "暂无资讯"}
-					desc={
-						isIdle
-							? "填入 API 地址后，这里才会开始同步资讯。"
-							: "接口返回为空，可以稍后再打开或手动刷新。"
-					}
+					title={isIdle ? "暂无内容" : "暂无资讯"}
+					desc={isIdle ? "" : "暂无资讯"}
 				/>
 			) : (
 				<ol className="news-list">
@@ -138,7 +119,32 @@ export function DailyCard({
 			<CardTitle
 				icon={<Globe2 size={22} />}
 				title="今日 60 秒看世界"
-				right={<Status state={state} />}
+				right={
+					<div className="daily-actions">
+						<Status state={state} />
+						{fullTextUrl ? (
+							<a
+								className="outline-button icon-button"
+								href={fullTextUrl}
+								target="_blank"
+								rel="noreferrer"
+								aria-label="查看全文"
+								title="查看全文"
+							>
+								<ExternalLink size={17} />
+							</a>
+						) : (
+							<button
+								className="outline-button icon-button"
+								disabled
+								aria-label="查看全文"
+								title="查看全文"
+							>
+								<ExternalLink size={17} />
+							</button>
+						)}
+					</div>
+				}
 			/>
 			<div className="subline">
 				<span>{state.data?.date || "今日"}</span>
@@ -147,12 +153,8 @@ export function DailyCard({
 			</div>
 			{isEmpty ? (
 				<EmptyState
-					title={isIdle ? "请先配置 API" : "今日简报暂时为空"}
-					desc={
-						isIdle
-							? "填入 API 地址后，今日简报会自动同步。"
-							: "上游接口已响应，但没有返回新闻条目。"
-					}
+					title={isIdle ? "暂无内容" : "今日简报暂时为空"}
+					desc={isIdle ? "" : "今日简报暂时为空"}
 				/>
 			) : (
 				<ol className="news-list">
@@ -166,29 +168,6 @@ export function DailyCard({
 					))}
 				</ol>
 			)}
-			<div className="button-row">
-				{fullTextUrl ? (
-					<a
-						className="outline-button"
-						href={fullTextUrl}
-						target="_blank"
-						rel="noreferrer"
-					>
-						<ExternalLink size={17} /> 查看全文
-					</a>
-				) : (
-					<button className="outline-button" disabled>
-						<ExternalLink size={17} /> 查看全文
-					</button>
-				)}
-				<button
-					className="outline-button"
-					onClick={state.reload}
-					disabled={isIdle}
-				>
-					<RefreshCw size={17} /> 刷新
-				</button>
-			</div>
 		</article>
 	);
 }

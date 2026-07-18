@@ -4,7 +4,6 @@ import {
 	CloudSun,
 	Droplets,
 	Gauge,
-	MapPin,
 	Wind,
 } from "lucide-react";
 import type { WeatherForecast, WeatherRealtime } from "../api";
@@ -32,18 +31,6 @@ export function WeatherPage({
 	const air = realtime.data?.air_quality;
 	return (
 		<section className="page-stack">
-			<div className="page-title">
-				<span>
-					<CloudSun size={24} /> 天气中心
-				</span>
-				<label className="city-select page-city">
-					<MapPin size={17} />
-					<input
-						value={city}
-						onChange={(event) => setCity(event.target.value)}
-					/>
-				</label>
-			</div>
 			<WeatherCard
 				city={city}
 				setCity={setCity}
@@ -121,12 +108,15 @@ export function WeatherCard({
 		!realtime.error &&
 		realtime.data === undefined &&
 		!realtime.updatedAt;
+	const weatherStatusLabel = current?.updated
+		? `更新 ${current.updated.slice(11, 16)}`
+		: "未来 7 天";
 
 	return (
 		<article className={`card weather-card ${compact ? "home-weather" : ""}`}>
 			<CardTitle
 				icon={<CloudSun size={22} />}
-				title="城市天气"
+				title={compact ? "城市天气" : `${city || "城市"}天气`}
 				right={
 					<div className="weather-actions">
 						<label className="mini-input">
@@ -135,10 +125,12 @@ export function WeatherCard({
 								onChange={(event) => setCity(event.target.value)}
 							/>
 						</label>
-						<span className="status weather-status">
-							{current?.updated
-								? `更新 ${current.updated.slice(11, 16)}`
-								: "未来 7 天"}
+						<span
+							className="status icon-status weather-status"
+							aria-label={weatherStatusLabel}
+							title={weatherStatusLabel}
+						>
+							<CalendarClock size={15} />
 						</span>
 					</div>
 				}
@@ -151,7 +143,7 @@ export function WeatherCard({
 						<span>°C</span>
 					</div>
 					<div className="weather-summary">
-						<b>{current?.condition || (isIdle ? "未配置 API" : "读取中")}</b>
+						<b>{current?.condition || (isIdle ? "--" : "读取中")}</b>
 						<small>
 							{realtime.data?.location?.city ||
 								realtime.data?.location?.name ||

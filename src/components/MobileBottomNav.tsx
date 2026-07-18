@@ -41,7 +41,7 @@ export function MobileNav({
 							aria-current={active ? "page" : undefined}
 							onClick={handleClick}
 						>
-							<Icon size={21} />
+							{variant === "bottom" && <Icon size={21} />}
 							<span>{item.label}</span>
 						</button>
 					);

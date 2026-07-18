@@ -1,5 +1,4 @@
 import {
-	CalendarClock,
 	CircleDollarSign,
 	Coins,
 	Film,
@@ -70,12 +69,6 @@ export function MarketStrip({
 					sub="实时汇率"
 					tone="red"
 				/>
-				<Metric
-					icon={<CalendarClock size={31} />}
-					label="本地缓存"
-					value="10 分钟"
-					sub="手动刷新可跳过缓存"
-				/>
 			</div>
 		</article>
 	);
@@ -101,9 +94,7 @@ export function EntertainmentCard({
 						<small>实时</small>
 					</div>
 					{movies.length === 0 && (
-						<p className="muted">
-							{apiReady ? "正在读取票房..." : "配置 API 后同步票房..."}
-						</p>
+						apiReady ? <p className="muted">正在读取票房...</p> : null
 					)}
 					{movies.map((movie, index) => (
 						<div
@@ -125,9 +116,7 @@ export function EntertainmentCard({
 						<small>每周</small>
 					</div>
 					{games.length === 0 && (
-						<p className="muted">
-							{apiReady ? "正在读取游戏..." : "配置 API 后同步游戏..."}
-						</p>
+						apiReady ? <p className="muted">正在读取游戏...</p> : null
 					)}
 					{games.map((game) => (
 						<a
@@ -229,7 +218,7 @@ export function ToolShortcuts({
 							<Icon size={24} />
 							<span>
 								<b>{tool.label}</b>
-								<small>{apiBase.trim() ? "API 地址无效" : "先配置 API"}</small>
+								<small>{tool.sub}</small>
 							</span>
 						</button>
 					);

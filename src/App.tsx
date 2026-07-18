@@ -8,12 +8,12 @@ import {
 import {
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import {
 	type DailyNews,
 	DEFAULT_API_BASE,
-	type EndpointDefinition,
 	type EpicGame,
 	type ExchangeRate,
 	endpoints,
@@ -22,7 +22,6 @@ import {
 	normalizeApiBase,
 	normalizeApiBaseInput,
 	toItems,
-	tryBuildUrl,
 	type WeatherForecast,
 	type WeatherRealtime,
 } from "./api";
@@ -36,23 +35,20 @@ import { Header } from "./components/Header";
 import { HotPage } from "./components/Hot";
 import { MarketStrip } from "./components/HomeCards";
 import { HomePage } from "./components/HomePage";
-import { MobileNav } from "./components/MobileBottomNav";
 import { NewsPage } from "./components/News";
 import { PwaStatusBar } from "./components/PwaStatusBar";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ToolWorkspace } from "./components/ToolWorkspace";
 import { WeatherPage } from "./components/Weather";
+import { Footer } from "./components/ui";
 import {
-	CardTitle,
-	Footer,
-} from "./components/ui";
-import {
-	categoryLabels,
 	chromeThemes,
 	colorThemes,
 	API_DOCS_URL,
 	API_REPO_URL,
+	defaultHotBoardPreferences,
 	defaultQuickFavorites,
+	hotBoards,
 	hotTabs,
 	mobileNavModes,
 	quickActions,
@@ -70,10 +66,12 @@ import {
 } from "./storage";
 import type {
 	ApiState,
+	AccentThemeState,
 	AvatarState,
 	ChromeTheme,
 	ColorTheme,
 	EndpointFavoriteId,
+	HotBoardId,
 	MobileNavMode,
 	PageId,
 	QuickActionDefinition,
@@ -85,22 +83,22 @@ import type {
 } from "./types";
 import {
 	buildSearchTarget,
-	defaults,
+	getAccentStyle,
 	getWallpaperStyle,
 } from "./utils";
 import {
 	applyServiceWorkerUpdate,
-	isStandaloneDisplay,
 	registerServiceWorker,
-	shouldShowIosInstallHint,
 } from "./pwa";
 
 const DEFAULT_CITY = "上海";
-const DEFAULT_SEARCH_PROVIDER: SearchProviderId = "site";
-const DEFAULT_CHROME_THEME: ChromeTheme = "minimal";
+const DEFAULT_SEARCH_PROVIDER: SearchProviderId = "bing";
+const DEFAULT_CHROME_THEME: ChromeTheme = "classic";
 const DEFAULT_COLOR_THEME: ColorTheme = "light";
+const DEFAULT_ACCENT_THEME: AccentThemeState = { mode: "green" };
 const DEFAULT_MOBILE_NAV_MODE: MobileNavMode = "auto";
 const DEFAULT_SETTINGS_STATE: SettingsState = {
+	showSearch: true,
 	showWeather: true,
 	showHot: true,
 	showNews: true,
@@ -108,8 +106,8 @@ const DEFAULT_SETTINGS_STATE: SettingsState = {
 };
 const DEFAULT_AVATAR_STATE: AvatarState = { mode: "default" };
 const DEFAULT_WALLPAPER_STATE: WallpaperState = { mode: "default" };
-const CONFIG_EXPORT_VERSION = 1;
-const LEGACY_DEFAULT_API_BASE = "https://60s.viki.moe/v2";
+const CONFIG_EXPORT_VERSION = 2;
+const PAGE_IDS: PageId[] = ["home", "hot", "news", "weather", "tools", "settings"];
 
 type ConfigActionResult = {
 	ok: boolean;
@@ -122,6 +120,7 @@ type ExportedSettings = {
 	searchProvider: SearchProviderId;
 	chromeTheme: ChromeTheme;
 	colorTheme: ColorTheme;
+	accentTheme: AccentThemeState;
 	mobileNavMode: MobileNavMode;
 	wallpaper: WallpaperState;
 	avatar: AvatarState;
@@ -129,6 +128,7 @@ type ExportedSettings = {
 	homeCardLayout: HomeCardLayout;
 	endpointFavorites: EndpointFavoriteId[];
 	quickFavorites: QuickFavoriteId[];
+	hotBoardPreferences: HotBoardId[];
 };
 
 function normalizeEndpointFavorites(value: unknown): EndpointFavoriteId[] {
@@ -170,6 +170,28 @@ function normalizeQuickFavorites(
 	return favorites;
 }
 
+function normalizeHotBoardPreferences(
+	value: unknown,
+	fallback: HotBoardId[] = defaultHotBoardPreferences,
+): HotBoardId[] {
+	if (value === undefined || !Array.isArray(value)) return [...fallback];
+	const knownIds = new Set<HotBoardId>(
+		hotBoards.map((board) => board.id),
+	);
+	const assigned = new Set<string>();
+	const preferences: HotBoardId[] = [];
+
+	for (const item of value) {
+		if (typeof item !== "string") continue;
+		const id = item as HotBoardId;
+		if (!knownIds.has(id) || assigned.has(id)) continue;
+		assigned.add(id);
+		preferences.push(id);
+	}
+
+	return preferences.length > 0 ? preferences : [...fallback];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -197,22 +219,74 @@ function readEnum<T extends string>(
 	throw new Error(`${label} 配置值无效`);
 }
 
-function isLegacyDefaultApiBase(value: string) {
-	try {
-		return normalizeApiBase(value) === LEGACY_DEFAULT_API_BASE;
-	} catch {
-		return false;
-	}
+function normalizeChromeTheme(value: unknown): ChromeTheme {
+	if (value === "single") return "single";
+	if (value === "floating") return "floating";
+	return "classic";
+}
+
+function normalizePageId(value: unknown): PageId {
+	return typeof value === "string" && PAGE_IDS.includes(value as PageId)
+		? (value as PageId)
+		: "home";
+}
+
+function normalizeSearchProvider(value: unknown): SearchProviderId {
+	return searchProviders.some((provider) => provider.id === value)
+		? (value as SearchProviderId)
+		: DEFAULT_SEARCH_PROVIDER;
+}
+
+function normalizeSettingsState(value: unknown): SettingsState {
+	if (!isRecord(value)) return DEFAULT_SETTINGS_STATE;
+	return {
+		showSearch:
+			typeof value.showSearch === "boolean"
+				? value.showSearch
+				: DEFAULT_SETTINGS_STATE.showSearch,
+		showWeather:
+			typeof value.showWeather === "boolean"
+				? value.showWeather
+				: DEFAULT_SETTINGS_STATE.showWeather,
+		showHot:
+			typeof value.showHot === "boolean"
+				? value.showHot
+				: DEFAULT_SETTINGS_STATE.showHot,
+		showNews:
+			typeof value.showNews === "boolean"
+				? value.showNews
+				: DEFAULT_SETTINGS_STATE.showNews,
+		autoRefresh:
+			typeof value.autoRefresh === "boolean"
+				? value.autoRefresh
+				: DEFAULT_SETTINGS_STATE.autoRefresh,
+	};
 }
 
 function readInitialApiBase() {
 	const value = readStoredValue(STORAGE_KEYS.apiBase, DEFAULT_API_BASE);
-	if (isLegacyDefaultApiBase(value)) return DEFAULT_API_BASE;
 	try {
 		return value.trim() ? normalizeApiBaseInput(value) : DEFAULT_API_BASE;
 	} catch {
 		return value;
 	}
+}
+
+function normalizeAccentTheme(value: unknown): AccentThemeState {
+	if (!isRecord(value)) return DEFAULT_ACCENT_THEME;
+	const mode = readEnum(
+		value.mode,
+		["green", "blue", "coral", "violet", "custom"] as const,
+		DEFAULT_ACCENT_THEME.mode,
+		"主题色",
+	);
+	const color = typeof value.color === "string" ? value.color : undefined;
+	if (mode === "custom") {
+		return /^#?[0-9a-f]{6}$/i.test(color || "")
+			? { mode, color: color?.startsWith("#") ? color : `#${color}` }
+			: DEFAULT_ACCENT_THEME;
+	}
+	return { mode };
 }
 
 function hasStored60sSettings() {
@@ -242,7 +316,7 @@ function parseImportedConfig(raw: string): ExportedSettings {
 	if (!isRecord(parsed) || parsed.app !== "60s-web") {
 		throw new Error("这不是 60s-web 的配置文件");
 	}
-	if (parsed.version !== CONFIG_EXPORT_VERSION) {
+	if (parsed.version !== 1 && parsed.version !== CONFIG_EXPORT_VERSION) {
 		throw new Error("配置文件版本不兼容");
 	}
 	if (!isRecord(parsed.settings)) {
@@ -252,9 +326,7 @@ function parseImportedConfig(raw: string): ExportedSettings {
 	const config = parsed.settings;
 	const importedApiBase = readString(config.apiBase, DEFAULT_API_BASE).trim();
 	const apiBase = importedApiBase
-		? isLegacyDefaultApiBase(importedApiBase)
-			? DEFAULT_API_BASE
-			: normalizeApiBaseInput(importedApiBase)
+		? normalizeApiBaseInput(importedApiBase)
 		: DEFAULT_API_BASE;
 	const wallpaperConfig = isRecord(config.wallpaper) ? config.wallpaper : {};
 	const wallpaperMode = readEnum(
@@ -268,34 +340,30 @@ function parseImportedConfig(raw: string): ExportedSettings {
 	return {
 		apiBase,
 		city: readString(config.city, DEFAULT_CITY).trim() || DEFAULT_CITY,
-		searchProvider: readEnum(
-			config.searchProvider,
-			searchProviders.map((item) => item.id),
-			DEFAULT_SEARCH_PROVIDER,
-			"搜索引擎",
-		),
-		chromeTheme: readEnum(
-			config.chromeTheme,
-			chromeThemes.map((item) => item.id),
-			DEFAULT_CHROME_THEME,
-			"外壳主题",
-		),
+		searchProvider: normalizeSearchProvider(config.searchProvider),
+		chromeTheme: normalizeChromeTheme(config.chromeTheme),
 		colorTheme: readEnum(
 			config.colorTheme,
 			colorThemes.map((item) => item.id),
 			DEFAULT_COLOR_THEME,
 			"明暗主题",
 		),
+		accentTheme: normalizeAccentTheme(config.accentTheme),
 		mobileNavMode: readEnum(
 			config.mobileNavMode,
 			mobileNavModes.map((item) => item.id),
 			DEFAULT_MOBILE_NAV_MODE,
-			"移动端导航",
+			"导航",
 		),
 		wallpaper:
 			wallpaperMode === "custom" ? DEFAULT_WALLPAPER_STATE : { mode: wallpaperMode },
 		avatar: DEFAULT_AVATAR_STATE,
 		modules: {
+			showSearch: readBoolean(
+				modules.showSearch,
+				DEFAULT_SETTINGS_STATE.showSearch,
+				"搜索栏",
+			),
 			showWeather: readBoolean(
 				modules.showWeather,
 				DEFAULT_SETTINGS_STATE.showWeather,
@@ -322,6 +390,7 @@ function parseImportedConfig(raw: string): ExportedSettings {
 		),
 		endpointFavorites: normalizeEndpointFavorites(config.endpointFavorites),
 		quickFavorites: normalizeQuickFavorites(config.quickFavorites),
+		hotBoardPreferences: normalizeHotBoardPreferences(config.hotBoardPreferences),
 	};
 }
 
@@ -331,30 +400,36 @@ export function App() {
 		readStoredValue(STORAGE_KEYS.city, DEFAULT_CITY),
 	);
 	const [query, setQuery] = useState("");
-	const [activePage, setActivePage] = useState<PageId>("home");
+	const [quickDrawerOpen, setQuickDrawerOpen] = useState(false);
+	const quickDrawerCloseTimer = useRef<number | null>(null);
+	const [activePage, setActivePage] = useState<PageId>(() =>
+		normalizePageId(readStoredValue(STORAGE_KEYS.activePage, "home")),
+	);
 	const [activeTool, setActiveTool] = useState<ToolId>("translate");
 	const [searchProvider, setSearchProvider] = useState<SearchProviderId>(
-		() =>
-			readStoredValue(
-				STORAGE_KEYS.searchProvider,
-				DEFAULT_SEARCH_PROVIDER,
-			) as SearchProviderId,
+		() => normalizeSearchProvider(
+			readStoredValue(STORAGE_KEYS.searchProvider, DEFAULT_SEARCH_PROVIDER),
+		),
 	);
 	const [chromeTheme, setChromeTheme] = useState<ChromeTheme>(
-		() =>
-			readStoredValue(
-				STORAGE_KEYS.chromeTheme,
-				DEFAULT_CHROME_THEME,
-			) as ChromeTheme,
+		() => normalizeChromeTheme(readStoredValue(
+			STORAGE_KEYS.chromeTheme,
+			DEFAULT_CHROME_THEME,
+		)),
 	);
 	const [colorTheme, setColorTheme] = useState<ColorTheme>(
 		() =>
 			readStoredValue(STORAGE_KEYS.colorTheme, DEFAULT_COLOR_THEME) as ColorTheme,
 	);
+	const [accentTheme, setAccentTheme] = useState<AccentThemeState>(() =>
+		normalizeAccentTheme(
+			readStoredJson(STORAGE_KEYS.accentTheme, DEFAULT_ACCENT_THEME),
+		),
+	);
 	const [mobileNavMode, setMobileNavMode] = useState<MobileNavMode>(
 		readStoredMobileNavMode,
 	);
-	const [hotTab, setHotTab] = useState(hotTabs[1]);
+	const [hotTab, setHotTab] = useState<(typeof hotTabs)[number]>(hotTabs[0]);
 	const [avatar, setAvatar] = useState<AvatarState>(() =>
 		readStoredJson(STORAGE_KEYS.avatar, DEFAULT_AVATAR_STATE),
 	);
@@ -362,7 +437,9 @@ export function App() {
 		readStoredJson(STORAGE_KEYS.wallpaper, DEFAULT_WALLPAPER_STATE),
 	);
 	const [settings, setSettings] = useState<SettingsState>(() =>
-		readStoredJson(STORAGE_KEYS.settings, DEFAULT_SETTINGS_STATE),
+		normalizeSettingsState(
+			readStoredJson(STORAGE_KEYS.settings, DEFAULT_SETTINGS_STATE),
+		),
 	);
 	const [homeCardLayout, setHomeCardLayout] = useState<HomeCardLayout>(() =>
 		normalizeHomeCardLayout(
@@ -381,91 +458,115 @@ export function App() {
 			readStoredJson(STORAGE_KEYS.quickFavorites, defaultQuickFavorites),
 		),
 	);
+	const [hotBoardPreferences, setHotBoardPreferences] = useState<HotBoardId[]>(
+		() =>
+			normalizeHotBoardPreferences(
+				readStoredJson(
+					STORAGE_KEYS.hotBoardPreferences,
+					defaultHotBoardPreferences,
+				),
+			),
+	);
 	const [isOffline, setIsOffline] = useState(() =>
 		typeof navigator === "undefined" ? false : !navigator.onLine,
 	);
 	const [serviceWorkerUpdate, setServiceWorkerUpdate] =
 		useState<ServiceWorkerRegistration | null>(null);
-	const [showInstallHint, setShowInstallHint] = useState(false);
-	const [isStandalone, setIsStandalone] = useState(isStandaloneDisplay);
-	const [bottomNavHidden, setBottomNavHidden] = useState(false);
 	const [showApiGuide, setShowApiGuide] = useState(() => {
 		if (typeof window === "undefined") return false;
-		const dismissed =
-			readStoredValue(STORAGE_KEYS.apiGuideDismissed, "false") === "true";
-		return !dismissed && !apiBase.trim();
+		return !apiBase.trim();
 	});
 	const hasApiBase = Boolean(apiBase.trim());
+	const hasSearchQuery = Boolean(query.trim());
+	const visibleHotTabs = useMemo(() => {
+		const preferenceSet = new Set(hotBoardPreferences);
+		return hotTabs.filter((tab) =>
+			preferenceSet.has(tab.id as HotBoardId),
+		);
+	}, [hotBoardPreferences]);
+
+	const clearQuickDrawerClose = () => {
+		if (quickDrawerCloseTimer.current === null) return;
+		window.clearTimeout(quickDrawerCloseTimer.current);
+		quickDrawerCloseTimer.current = null;
+	};
+
+	const openQuickDrawer = () => {
+		clearQuickDrawerClose();
+		setQuickDrawerOpen(true);
+	};
+
+	const scheduleQuickDrawerClose = () => {
+		clearQuickDrawerClose();
+		quickDrawerCloseTimer.current = window.setTimeout(() => {
+			setQuickDrawerOpen(false);
+			quickDrawerCloseTimer.current = null;
+		}, 220);
+	};
+
+	useEffect(() => {
+		return clearQuickDrawerClose;
+	}, []);
 
 	const daily = useApi<DailyNews>(
 		apiBase,
 		"/60s",
 		{},
 		settings.showNews && hasApiBase,
-		settings.autoRefresh,
 	);
 	const weather = useApi<WeatherRealtime>(
 		apiBase,
 		"/weather/realtime",
 		{ query: city },
 		settings.showWeather && hasApiBase,
-		settings.autoRefresh,
 	);
 	const forecast = useApi<WeatherForecast>(
 		apiBase,
 		"/weather/forecast",
 		{ query: city, days: "7" },
 		settings.showWeather && hasApiBase,
-		settings.autoRefresh,
 	);
 	const hot = useApi<unknown>(
 		apiBase,
 		hotTab.path,
 		{},
-		settings.showHot && hasApiBase,
-		settings.autoRefresh,
+		settings.showHot && hasApiBase && visibleHotTabs.length > 0,
 	);
 	const gold = useApi<GoldPrice>(
 		apiBase,
 		"/gold-price",
 		{},
 		hasApiBase,
-		settings.autoRefresh,
 	);
 	const fuel = useApi<FuelPrice>(
 		apiBase,
 		"/fuel-price",
 		{ region: city },
 		hasApiBase,
-		settings.autoRefresh,
 	);
 	const exchange = useApi<ExchangeRate>(
 		apiBase,
 		"/exchange-rate",
 		{ currency: "CNY" },
 		hasApiBase,
-		settings.autoRefresh,
 	);
 	const epic = useApi<EpicGame[]>(
 		apiBase,
 		"/epic",
 		{},
 		hasApiBase,
-		settings.autoRefresh,
 	);
 	const maoyan = useApi<unknown>(
 		apiBase,
 		"/maoyan/realtime/movie",
 		{},
 		hasApiBase,
-		settings.autoRefresh,
 	);
 	const hitokoto = useApi<unknown>(
 		apiBase,
 		"/hitokoto",
 		{},
 		hasApiBase,
-		settings.autoRefresh,
 	);
 
 	const hotItems = useMemo(() => toItems(hot.data).slice(0, 10), [hot.data]);
@@ -473,24 +574,6 @@ export function App() {
 		() => toItems(maoyan.data).slice(0, 4),
 		[maoyan.data],
 	);
-
-	const searchMatches = useMemo(() => {
-		const keyword = query.trim().toLowerCase();
-		if (!keyword) return [];
-		return endpoints
-			.filter((endpoint) =>
-				[
-					endpoint.name,
-					endpoint.path,
-					endpoint.description,
-					categoryLabels[endpoint.category],
-				]
-					.join(" ")
-					.toLowerCase()
-					.includes(keyword),
-			)
-			.slice(0, 8);
-	}, [query]);
 
 	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.apiBase, apiBase);
@@ -501,7 +584,6 @@ export function App() {
 		try {
 			normalizeApiBase(apiBase);
 			setShowApiGuide(false);
-			writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
 		} catch {
 			// Keep the guide available until the saved API address is valid.
 		}
@@ -510,6 +592,10 @@ export function App() {
 	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.city, city);
 	}, [city]);
+
+	useEffect(() => {
+		writeStoredValue(STORAGE_KEYS.activePage, activePage);
+	}, [activePage]);
 
 	useEffect(() => {
 		writeStoredJson(STORAGE_KEYS.settings, settings);
@@ -534,6 +620,13 @@ export function App() {
 	}, [quickFavorites]);
 
 	useEffect(() => {
+		writeStoredJson(
+			STORAGE_KEYS.hotBoardPreferences,
+			normalizeHotBoardPreferences(hotBoardPreferences, []),
+		);
+	}, [hotBoardPreferences]);
+
+	useEffect(() => {
 		writeStoredJson(STORAGE_KEYS.avatar, avatar);
 	}, [avatar]);
 
@@ -548,6 +641,10 @@ export function App() {
 	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.colorTheme, colorTheme);
 	}, [colorTheme]);
+
+	useEffect(() => {
+		writeStoredJson(STORAGE_KEYS.accentTheme, normalizeAccentTheme(accentTheme));
+	}, [accentTheme]);
 
 	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.mobileNavMode, mobileNavMode);
@@ -567,20 +664,6 @@ export function App() {
 	useEffect(() => registerServiceWorker(setServiceWorkerUpdate), []);
 
 	useEffect(() => {
-		const dismissed =
-			readStoredValue(STORAGE_KEYS.iosInstallHintDismissed, "false") === "true";
-		setShowInstallHint(!dismissed && shouldShowIosInstallHint());
-	}, []);
-
-	useEffect(() => {
-		const query = window.matchMedia("(display-mode: standalone)");
-		const updateStandalone = () => setIsStandalone(isStandaloneDisplay());
-		query.addEventListener("change", updateStandalone);
-		updateStandalone();
-		return () => query.removeEventListener("change", updateStandalone);
-	}, []);
-
-	useEffect(() => {
 		const themeColor = colorTheme === "dark" ? "#07100f" : "#ffffff";
 		let meta = document.querySelector<HTMLMetaElement>(
 			'meta[name="theme-color"]',
@@ -594,6 +677,11 @@ export function App() {
 	}, [colorTheme]);
 
 	useEffect(() => {
+		if (visibleHotTabs.some((tab) => tab.id === hotTab.id)) return;
+		if (visibleHotTabs[0]) setHotTab(visibleHotTabs[0]);
+	}, [hotTab.id, visibleHotTabs]);
+
+	useEffect(() => {
 		writeStoredJson(STORAGE_KEYS.wallpaper, wallpaper);
 	}, [wallpaper]);
 
@@ -603,6 +691,7 @@ export function App() {
 		setSearchProvider(config.searchProvider);
 		setChromeTheme(config.chromeTheme);
 		setColorTheme(config.colorTheme);
+		setAccentTheme(config.accentTheme);
 		setMobileNavMode(config.mobileNavMode);
 		setWallpaper(config.wallpaper);
 		setAvatar(config.avatar);
@@ -610,6 +699,7 @@ export function App() {
 		setHomeCardLayout(config.homeCardLayout);
 		setEndpointFavorites(config.endpointFavorites);
 		setQuickFavorites(config.quickFavorites);
+		setHotBoardPreferences(config.hotBoardPreferences);
 	};
 
 	const exportConfig = (): ConfigActionResult => {
@@ -627,6 +717,7 @@ export function App() {
 				searchProvider,
 				chromeTheme,
 				colorTheme,
+				accentTheme: normalizeAccentTheme(accentTheme),
 				mobileNavMode,
 				wallpaper: exportWallpaper,
 				avatar: DEFAULT_AVATAR_STATE,
@@ -634,6 +725,10 @@ export function App() {
 				homeCardLayout: normalizeHomeCardLayout(homeCardLayout),
 				endpointFavorites: normalizeEndpointFavorites(endpointFavorites),
 				quickFavorites: normalizeQuickFavorites(quickFavorites, []),
+				hotBoardPreferences: normalizeHotBoardPreferences(
+					hotBoardPreferences,
+					[],
+				),
 			},
 		};
 		const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -673,6 +768,7 @@ export function App() {
 			searchProvider: DEFAULT_SEARCH_PROVIDER,
 			chromeTheme: DEFAULT_CHROME_THEME,
 			colorTheme: DEFAULT_COLOR_THEME,
+			accentTheme: DEFAULT_ACCENT_THEME,
 			mobileNavMode: DEFAULT_MOBILE_NAV_MODE,
 			wallpaper: DEFAULT_WALLPAPER_STATE,
 			avatar: DEFAULT_AVATAR_STATE,
@@ -680,6 +776,7 @@ export function App() {
 			homeCardLayout: normalizeHomeCardLayout(defaultHomeCardLayout),
 			endpointFavorites: [],
 			quickFavorites: defaultQuickFavorites,
+			hotBoardPreferences: defaultHotBoardPreferences,
 		});
 		setShowApiGuide(true);
 		return { ok: true, message: "已恢复默认设置，并清理本地缓存。" };
@@ -701,61 +798,14 @@ export function App() {
 		setActivePage(target.page);
 	};
 
-	const resolvedMobileNav =
-		mobileNavMode === "auto"
-			? isStandalone
-				? "bottom"
-				: "top"
-			: mobileNavMode;
-
-	useEffect(() => {
-		if (resolvedMobileNav !== "bottom") {
-			setBottomNavHidden(false);
-			return;
-		}
-
-		let lastScrollY = window.scrollY;
-		let ticking = false;
-
-		const updateNavVisibility = () => {
-			const currentScrollY = window.scrollY;
-			const delta = currentScrollY - lastScrollY;
-
-			if (currentScrollY < 80) {
-				setBottomNavHidden(false);
-			} else if (delta > 12) {
-				setBottomNavHidden(true);
-			} else if (delta < -12) {
-				setBottomNavHidden(false);
-			}
-
-			lastScrollY = currentScrollY;
-			ticking = false;
-		};
-
-		const handleScroll = () => {
-			if (ticking) return;
-			ticking = true;
-			window.requestAnimationFrame(updateNavVisibility);
-		};
-
-		window.addEventListener("scroll", handleScroll, { passive: true });
-		return () => window.removeEventListener("scroll", handleScroll);
-	}, [resolvedMobileNav]);
-
 	const dismissApiGuide = () => {
 		setShowApiGuide(false);
-		writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
 	};
 
 	const runSearch = () => {
 		const keyword = query.trim();
 		if (!keyword) {
 			setActivePage("home");
-			return;
-		}
-		if (searchProvider === "site") {
-			setActivePage("tools");
 			return;
 		}
 		window.open(
@@ -767,8 +817,11 @@ export function App() {
 
 	return (
 		<div
-			className={`app-shell chrome-${chromeTheme} theme-${colorTheme} mobile-nav-${resolvedMobileNav}`}
-			style={getWallpaperStyle(wallpaper, colorTheme)}
+			className={`app-shell chrome-${chromeTheme} theme-${colorTheme} wallpaper-${wallpaper.mode}`}
+			style={{
+				...getWallpaperStyle(wallpaper, colorTheme),
+				...getAccentStyle(accentTheme),
+			}}
 		>
 			<Header
 				activePage={activePage}
@@ -778,83 +831,108 @@ export function App() {
 				colorTheme={colorTheme}
 				setColorTheme={setColorTheme}
 			/>
-			{resolvedMobileNav === "top" && (
-				<MobileNav
-					activePage={activePage}
-					setActivePage={setActivePage}
-					variant="top"
-				/>
-			)}
 			<PwaStatusBar
 				isOffline={isOffline}
 				updateReady={Boolean(serviceWorkerUpdate)}
-				showInstallHint={showInstallHint}
 				onApplyUpdate={() => {
 					applyServiceWorkerUpdate(serviceWorkerUpdate);
 					setServiceWorkerUpdate(null);
 				}}
-				onDismissInstallHint={() => {
-					writeStoredValue(STORAGE_KEYS.iosInstallHintDismissed, "true");
-					setShowInstallHint(false);
-				}}
 			/>
 
 			<main>
-				<section className="search-band">
-					<form
-						className="search-box"
-						onSubmit={(event) => {
-							event.preventDefault();
-							runSearch();
-						}}
-					>
-						<Search size={24} />
-						<input
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-							placeholder={
-								searchProvider === "site"
-									? "搜索接口名称、分类、路径或功能关键词..."
-									: `输入关键词，用 ${searchProviders.find((item) => item.id === searchProvider)?.label} 搜索...`
-							}
-						/>
-						<button type="submit">搜索</button>
-					</form>
-					<div className="search-providers" aria-label="搜索目的地">
-						{searchProviders.map((provider) => (
-							<button
-								key={provider.id}
-								type="button"
-								className={searchProvider === provider.id ? "active" : ""}
-								onClick={() => setSearchProvider(provider.id)}
+				{settings.showSearch && activePage !== "settings" && (
+					<section className="search-band">
+						<form
+							className="search-box"
+							onSubmit={(event) => {
+								event.preventDefault();
+								runSearch();
+							}}
+						>
+							<Search size={24} />
+							<input
+								value={query}
+								onChange={(event) => setQuery(event.target.value)}
+								placeholder={`用 ${
+									searchProviders.find((item) => item.id === searchProvider)
+										?.label
+								} 搜索...`}
+							/>
+							{hasSearchQuery && (
+								<button
+									type="submit"
+									className="search-enter"
+									aria-label="按 Enter 搜索"
+									title="Enter"
+								>
+									Enter
+								</button>
+							)}
+						</form>
+						<div className="search-meta-row">
+							<div className="search-providers" aria-label="搜索目的地">
+								{searchProviders.map((provider) => (
+									<button
+										key={provider.id}
+										type="button"
+										className={searchProvider === provider.id ? "active" : ""}
+										onClick={() => setSearchProvider(provider.id)}
+										aria-label={`${provider.label} ${provider.sub}`}
+										title={`${provider.label} ${provider.sub}`}
+									>
+										{provider.label}
+									</button>
+								))}
+							</div>
+							<details
+								className="quick-drawer"
+								open={quickDrawerOpen}
+								onPointerEnter={openQuickDrawer}
+								onPointerLeave={scheduleQuickDrawerClose}
+								onFocus={openQuickDrawer}
+								onBlur={(event) => {
+									const nextTarget = event.relatedTarget;
+									if (
+										nextTarget instanceof Node &&
+										event.currentTarget.contains(nextTarget)
+									) {
+										return;
+									}
+									scheduleQuickDrawerClose();
+								}}
 							>
-								<b>{provider.label}</b>
-								<small>{provider.sub}</small>
-							</button>
-						))}
-					</div>
-					<QuickChips
-						favorites={quickFavorites}
-						onAction={runQuickAction}
-						onManage={() => setActivePage("settings")}
-					/>
-					{!hasApiBase && (
-						<ApiSetupBanner onOpen={() => setShowApiGuide(true)} />
-					)}
-					{searchMatches.length > 0 && (
-						<SearchResults base={apiBase} matches={searchMatches} />
-					)}
-				</section>
+								<summary
+									onClick={(event) => {
+										event.preventDefault();
+										openQuickDrawer();
+									}}
+								>
+									<LayoutGrid size={15} />
+									快捷
+								</summary>
+								<QuickChips
+									favorites={quickFavorites}
+									onAction={(action) => {
+										setQuickDrawerOpen(false);
+										runQuickAction(action);
+									}}
+									onManage={() => {
+										setQuickDrawerOpen(false);
+										setActivePage("settings");
+									}}
+								/>
+							</details>
+						</div>
+					</section>
+				)}
 
 				{activePage === "home" && (
 					<HomePage
-						apiBase={apiBase}
 						apiReady={hasApiBase}
-						setApiBase={setApiBase}
 						city={city}
 						setCity={setCity}
 						settings={settings}
-						setSettings={setSettings}
 						daily={daily}
 						weather={weather}
 						forecast={forecast}
@@ -863,6 +941,7 @@ export function App() {
 						exchange={exchange}
 						hotTab={hotTab}
 						setHotTab={setHotTab}
+						hotTabs={visibleHotTabs}
 						hot={hot}
 						hotItems={hotItems}
 						epic={epic}
@@ -870,12 +949,13 @@ export function App() {
 						hitokoto={hitokoto.data}
 						homeCardLayout={homeCardLayout}
 						setHomeCardLayout={setHomeCardLayout}
-						setActivePage={setActivePage}
-						setActiveTool={setActiveTool}
 					/>
 				)}
 				{activePage === "hot" && (
-					<HotPage apiBase={apiBase} />
+					<HotPage
+						apiBase={apiBase}
+						visibleHotBoardIds={hotBoardPreferences}
+					/>
 				)}
 				{activePage === "news" && <NewsPage apiBase={apiBase} daily={daily} />}
 				{activePage === "weather" && (
@@ -913,16 +993,17 @@ export function App() {
 							setChromeTheme={setChromeTheme}
 							colorTheme={colorTheme}
 							setColorTheme={setColorTheme}
-							mobileNavMode={mobileNavMode}
-							setMobileNavMode={setMobileNavMode}
+							accentTheme={accentTheme}
+							setAccentTheme={setAccentTheme}
+							settings={settings}
+							setSettings={setSettings}
 							onExportConfig={exportConfig}
 							onImportConfig={importConfig}
 							onResetConfig={resetConfig}
 							quickFavorites={quickFavorites}
 							setQuickFavorites={setQuickFavorites}
-							onResetQuickFavorites={() =>
-								setQuickFavorites([...defaultQuickFavorites])
-							}
+							hotBoardPreferences={hotBoardPreferences}
+							setHotBoardPreferences={setHotBoardPreferences}
 						/>
 					</section>
 				)}
@@ -933,14 +1014,6 @@ export function App() {
 				updatedAt={daily.updatedAt}
 				isOffline={isOffline}
 			/>
-			{resolvedMobileNav === "bottom" && (
-				<MobileNav
-					activePage={activePage}
-					setActivePage={setActivePage}
-					variant="bottom"
-					hidden={bottomNavHidden}
-				/>
-			)}
 			{showApiGuide && (
 				<ApiSetupGuide
 					initialApiBase={apiBase}
@@ -948,32 +1021,9 @@ export function App() {
 					onSave={(value) => {
 						setApiBase(value);
 						setShowApiGuide(false);
-						writeStoredValue(STORAGE_KEYS.apiGuideDismissed, "true");
 					}}
 				/>
 			)}
-		</div>
-	);
-}
-
-function ApiSetupBanner({ onOpen }: { onOpen: () => void }) {
-	return (
-		<div className="api-setup-banner" role="status">
-			<span>
-				<KeyRound size={20} />
-				<span>
-					<b>未配置 API</b>
-					<small>为减少公共实例压力，请选择公共实例或自行部署后填入地址。</small>
-				</span>
-			</span>
-			<div>
-				<a href={API_DOCS_URL} target="_blank" rel="noreferrer">
-					公共实例 <ExternalLink size={15} />
-				</a>
-				<button type="button" onClick={onOpen}>
-					填入 API
-				</button>
-			</div>
 		</div>
 	);
 }
@@ -1020,12 +1070,10 @@ function ApiSetupGuide({
 				<div className="api-guide-head">
 					<KeyRound size={24} />
 					<span>
-						<b id="api-guide-title">配置 60s API</b>
-						<small>默认不再内置公共域名，避免启动时消耗作者实例额度。</small>
+						<b id="api-guide-title">配置 API</b>
 					</span>
 				</div>
 				<div className="api-guide-copy">
-					<p>打开公共实例列表，选择可用域名或自行部署，然后把 API 基础地址填到这里。</p>
 					<div className="api-guide-links">
 						<a href={API_REPO_URL} target="_blank" rel="noreferrer">
 							自行部署 <ExternalLink size={15} />
@@ -1036,7 +1084,7 @@ function ApiSetupGuide({
 					</div>
 				</div>
 				<label className="api-guide-field">
-					<span>API 基础地址</span>
+					<span>API 地址</span>
 					<input
 						value={draft}
 						onChange={(event) => {
@@ -1109,34 +1157,6 @@ function QuickChips({
 	);
 }
 
-function SearchResults({
-	base,
-	matches,
-}: {
-	base: string;
-	matches: EndpointDefinition[];
-}) {
-	const hasApiBase = Boolean(base.trim());
-	return (
-		<div className="search-results">
-			{matches.map((endpoint) => {
-				const href = tryBuildUrl(base, endpoint.path, defaults(endpoint));
-				return href ? (
-					<a key={endpoint.id} href={href} target="_blank" rel="noreferrer">
-						<span>{endpoint.name}</span>
-						<small>{endpoint.path}</small>
-					</a>
-				) : (
-					<span className="disabled-result" key={endpoint.id}>
-						<span>{endpoint.name}</span>
-						<small>{hasApiBase ? "API 地址无效" : "先配置 API"}</small>
-					</span>
-				);
-			})}
-		</div>
-	);
-}
-
 function ToolsPage({
 	apiBase,
 	query,
@@ -1162,26 +1182,8 @@ function ToolsPage({
 }) {
 	return (
 		<section className="page-stack">
-			<div className="page-title">
-				<span>
-					<LayoutGrid size={24} /> 工具中心
-				</span>
-				<small>实用数据置顶，四个便捷工具平铺展示</small>
-			</div>
 			<MarketStrip gold={gold} fuel={fuel} exchange={exchange} city={city} />
 			<ToolWorkspace apiBase={apiBase} activeTool={activeTool} />
-			{query.trim() && (
-				<div className="card tool-query-tip">
-					<CardTitle
-						icon={<Search size={18} />}
-						title="搜索提示"
-						right={<span className="status">已筛选接口实验室</span>}
-					/>
-					<p>
-						你当前搜索的是接口或功能关键词，下方接口实验室会同步筛选匹配项。
-					</p>
-				</div>
-			)}
 			<EndpointLab
 				apiBase={apiBase}
 				query={query}

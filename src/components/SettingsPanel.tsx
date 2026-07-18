@@ -4,31 +4,37 @@ import {
 	Download,
 	ExternalLink,
 	FileUp,
+	Github,
 	Image as ImageIcon,
 	LayoutGrid,
 	Loader2,
 	Moon,
+	Palette,
 	RotateCcw,
 	Settings,
-	Smartphone,
+	SlidersHorizontal,
 	Star,
 	Sun,
 	Wifi,
+	X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchApi, normalizeApiBase, normalizeApiBaseInput } from "../api";
 import {
 	API_DOCS_URL,
+	WEB_REPO_URL,
+	accentThemes,
 	chromeThemes,
 	colorThemes,
-	mobileNavModes,
+	hotBoards,
 	quickActions,
 	wallpaperOptions,
 } from "../config";
 import type {
+	AccentThemeState,
 	ChromeTheme,
 	ColorTheme,
-	MobileNavMode,
+	HotBoardId,
 	QuickActionDefinition,
 	QuickFavoriteId,
 	SettingsState,
@@ -69,6 +75,29 @@ async function checkApiBase(base: string) {
 	}
 }
 
+function hasApiVersionSuffix(value: string) {
+	const cleanValue = value.trim();
+	if (!cleanValue) return true;
+	const withProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(cleanValue)
+		? cleanValue
+		: `https://${cleanValue}`;
+	try {
+		const url = new URL(withProtocol);
+		return /\/v\d+\/?$/i.test(url.pathname);
+	} catch {
+		return true;
+	}
+}
+
+function clampRangeValue(value: number | undefined, fallback: number) {
+	if (typeof value !== "number" || Number.isNaN(value)) return fallback;
+	return Math.min(Math.max(value, 0), 1);
+}
+
+function formatPercent(value: number) {
+	return `${Math.round(value * 100)}%`;
+}
+
 export function SettingsPanel({
 	apiBase,
 	setApiBase,
@@ -80,14 +109,17 @@ export function SettingsPanel({
 	setChromeTheme,
 	colorTheme,
 	setColorTheme,
-	mobileNavMode,
-	setMobileNavMode,
+	accentTheme,
+	setAccentTheme,
+	settings,
+	setSettings,
 	onExportConfig,
 	onImportConfig,
 	onResetConfig,
 	quickFavorites,
 	setQuickFavorites,
-	onResetQuickFavorites,
+	hotBoardPreferences,
+	setHotBoardPreferences,
 	compact = false,
 }: {
 	apiBase: string;
@@ -100,14 +132,17 @@ export function SettingsPanel({
 	setChromeTheme?: (value: ChromeTheme) => void;
 	colorTheme?: ColorTheme;
 	setColorTheme?: (value: ColorTheme) => void;
-	mobileNavMode?: MobileNavMode;
-	setMobileNavMode?: (value: MobileNavMode) => void;
+	accentTheme?: AccentThemeState;
+	setAccentTheme?: (value: AccentThemeState) => void;
+	settings?: SettingsState;
+	setSettings?: (value: SettingsState) => void;
 	onExportConfig?: () => ConfigActionResult;
 	onImportConfig?: (raw: string) => ConfigActionResult;
 	onResetConfig?: () => ConfigActionResult;
 	quickFavorites?: QuickFavoriteId[];
 	setQuickFavorites?: (favorites: QuickFavoriteId[]) => void;
-	onResetQuickFavorites?: () => void;
+	hotBoardPreferences?: HotBoardId[];
+	setHotBoardPreferences?: (preferences: HotBoardId[]) => void;
 	compact?: boolean;
 }) {
 	const wallpaperInputRef = useRef<HTMLInputElement | null>(null);
@@ -120,7 +155,23 @@ export function SettingsPanel({
 	const [configNotice, setConfigNotice] = useState<ConfigActionResult | null>(
 		null,
 	);
+	const [settingsSection, setSettingsSection] = useState<
+		"connect" | "appearance" | "preferences" | "data"
+	>("connect");
+	const [hiddenApiWarningValue, setHiddenApiWarningValue] = useState("");
 	const favoriteQuickSet = new Set(quickFavorites || []);
+	const selectedHotBoardSet = new Set(hotBoardPreferences || []);
+	const moduleToggles: Array<[keyof SettingsState, string]> = [
+		["showSearch", "搜索栏"],
+		["showWeather", "天气"],
+		["showHot", "热榜"],
+		["showNews", "新闻"],
+	];
+	const trimmedApiDraft = apiDraft.trim();
+	const showApiVersionWarning =
+		Boolean(trimmedApiDraft) &&
+		!hasApiVersionSuffix(trimmedApiDraft) &&
+		hiddenApiWarningValue !== trimmedApiDraft;
 
 	useEffect(() => {
 		setApiDraft(apiBase);
@@ -154,6 +205,11 @@ export function SettingsPanel({
 			setWallpaper({
 				mode: "custom",
 				src: reader.result,
+				imageOpacity: 0.78,
+				overlayOpacity: 0.48,
+				chromeOpacity: 0.68,
+				surfaceOpacity: 0.72,
+				blur: 0,
 				updatedAt: Date.now(),
 			});
 		};
@@ -244,324 +300,550 @@ export function SettingsPanel({
 		setQuickFavorites([...quickFavorites, action.id]);
 	};
 
+	const toggleHotBoard = (id: HotBoardId) => {
+		if (!hotBoardPreferences || !setHotBoardPreferences) return;
+		if (selectedHotBoardSet.has(id)) {
+			if (hotBoardPreferences.length <= 1) return;
+			setHotBoardPreferences(hotBoardPreferences.filter((item) => item !== id));
+			return;
+		}
+		setHotBoardPreferences([...hotBoardPreferences, id]);
+	};
+
+	const updateWallpaper = (patch: Partial<WallpaperState>) => {
+		if (!wallpaper || !setWallpaper) return;
+		setWallpaper({ ...wallpaper, ...patch });
+	};
+
+	const readWallpaperNumber = (
+		key: keyof Pick<
+			WallpaperState,
+			"imageOpacity" | "overlayOpacity" | "chromeOpacity" | "surfaceOpacity"
+		>,
+		fallback: number,
+	) => clampRangeValue(wallpaper?.[key], fallback);
+
 	return (
 		<article
-			className={`card settings-panel ${compact ? "compact-settings" : ""}`}
+			className={`card settings-panel settings-dashboard ${
+				compact ? "compact-settings" : ""
+			}`}
 		>
-			<CardTitle icon={<Settings size={21} />} title="全局设置" />
-			<div className="settings-grid">
-				<div className="api-base api-setting-row">
-					<span className="api-field-title">
-						<span>API 地址</span>
-						<a
-							className="settings-inline-link"
-							href={API_DOCS_URL}
-							target="_blank"
-							rel="noreferrer"
-						>
-							不知道填什么？公共实例列表 <ExternalLink size={13} />
-						</a>
-					</span>
-					<span className="api-control-row">
-						<input
-							value={apiDraft}
-							onChange={(event) => {
-								setApiDraft(event.target.value);
-								setApiCheck({ status: "idle", message: "" });
-							}}
-							onKeyDown={(event) => {
-								if (event.key === "Enter") {
-									event.preventDefault();
-									saveApiBase();
-								}
-							}}
-							placeholder="https://example.com/v2"
-						/>
-						<button
-							type="button"
-							className="outline-button"
-							onClick={saveApiBase}
-							disabled={apiCheck.status === "checking"}
-						>
-							保存
-						</button>
-						<button
-							type="button"
-							className="outline-button"
-							onClick={checkApiConnection}
-							disabled={apiCheck.status === "checking"}
-						>
-							{apiCheck.status === "checking" ? (
-								<Loader2 className="spin" size={16} />
-							) : (
-								<Wifi size={16} />
-							)}
-							检测
-						</button>
-					</span>
-					{apiCheck.message && (
-						<span className={`settings-notice ${apiCheck.status}`}>
-							{apiCheck.status === "success" ? (
-								<CheckCircle2 size={15} />
-							) : apiCheck.status === "checking" ? (
-								<Loader2 className="spin" size={15} />
-							) : (
-								<AlertTriangle size={15} />
-							)}
-							{apiCheck.message}
-						</span>
-					)}
-				</div>
-				{!compact && city !== undefined && setCity && (
-					<label className="api-base city-setting">
-						默认城市
-						<input
-							value={city}
-							onChange={(event) => setCity(event.target.value)}
-							placeholder="例如 上海"
-						/>
-					</label>
-				)}
-			</div>
-			{!compact && wallpaper && setWallpaper && (
-				<div className="appearance-settings">
-					{colorTheme && setColorTheme && (
-						<>
-							<div className="settings-subtitle">
-								<span>
-									{colorTheme === "dark" ? (
-										<Moon size={18} />
-									) : (
-										<Sun size={18} />
-									)}
-									明暗主题
-								</span>
-							</div>
-							<div className="color-theme-grid">
-								{colorThemes.map((theme) => (
-									<button
-										type="button"
-										key={theme.id}
-										className={colorTheme === theme.id ? "active" : ""}
-										onClick={() => setColorTheme(theme.id)}
-									>
-										<i className={`color-preview color-preview-${theme.id}`}>
-											<span />
-											<b />
-										</i>
-										<span>
-											<b>{theme.label}</b>
-											<small>{theme.sub}</small>
-										</span>
-									</button>
-								))}
-							</div>
-						</>
-					)}
-					{chromeTheme && setChromeTheme && (
-						<>
-							<div className="settings-subtitle">
-								<span>
-									<LayoutGrid size={18} /> 外壳主题
-								</span>
-							</div>
-							<div className="chrome-theme-grid">
-								{chromeThemes.map((theme) => (
-									<button
-										type="button"
-										key={theme.id}
-										className={chromeTheme === theme.id ? "active" : ""}
-										onClick={() => setChromeTheme(theme.id)}
-									>
-										<i className={`chrome-preview chrome-preview-${theme.id}`}>
-											<span />
-											<b />
-										</i>
-										<span>
-											<b>{theme.label}</b>
-											<small>{theme.sub}</small>
-										</span>
-									</button>
-								))}
-							</div>
-						</>
-					)}
-					{mobileNavMode && setMobileNavMode && (
-						<>
-							<div className="settings-subtitle">
-								<span>
-									<Smartphone size={18} /> 移动端导航
-								</span>
-							</div>
-							<div className="mobile-nav-mode-grid">
-								{mobileNavModes.map((mode) => (
-									<button
-										type="button"
-										key={mode.id}
-										className={mobileNavMode === mode.id ? "active" : ""}
-										onClick={() => setMobileNavMode(mode.id)}
-									>
-										<i className={`mobile-nav-preview mobile-nav-${mode.id}`}>
-											<span />
-											<b />
-										</i>
-										<span>
-											<b>{mode.label}</b>
-											<small>{mode.sub}</small>
-										</span>
-									</button>
-								))}
-							</div>
-						</>
-					)}
-					<div className="settings-subtitle">
-						<span>
-							<ImageIcon size={18} /> 壁纸
-						</span>
-					</div>
-					<div className="wallpaper-grid">
-						{wallpaperOptions.map((option) => (
+			{!compact && (
+				<div className="settings-nav" aria-label="设置分区">
+					{[
+						{ id: "connect" as const, label: "连接", icon: Wifi },
+						{ id: "appearance" as const, label: "外观", icon: Palette },
+						{
+							id: "preferences" as const,
+							label: "偏好",
+							icon: SlidersHorizontal,
+						},
+						{ id: "data" as const, label: "数据", icon: FileUp },
+					].map((item) => {
+						const Icon = item.icon;
+						return (
 							<button
 								type="button"
-								key={option.id}
-								className={wallpaper.mode === option.id ? "active" : ""}
-								onClick={() => {
-									if (option.id === "custom") {
-										wallpaperInputRef.current?.click();
-										return;
-									}
-									setWallpaper({ mode: option.id });
-								}}
+								key={item.id}
+								className={settingsSection === item.id ? "active" : ""}
+								onClick={() => setSettingsSection(item.id)}
 							>
-								<i className={`wallpaper-preview wallpaper-${option.id}`}>
-									{option.id === "custom" && wallpaper.src ? (
-										<img src={wallpaper.src} alt="" />
-									) : null}
-								</i>
-								<span>
-									<b>{option.label}</b>
-									<small>{option.sub}</small>
-								</span>
+								<Icon size={17} />
+								{item.label}
 							</button>
-						))}
-					</div>
-					<input
-						ref={wallpaperInputRef}
-						type="file"
-						accept="image/*"
-						hidden
-						onChange={(event) => handleWallpaperFile(event.target.files?.[0])}
-					/>
+						);
+					})}
 				</div>
 			)}
-			{!compact && quickFavorites && setQuickFavorites && (
-				<div className="quick-settings">
-					<div className="settings-subtitle">
+
+			{(compact || settingsSection === "connect") && (
+				<section className="settings-section">
+					<div className="settings-section-head">
 						<span>
-							<Star size={18} /> 快捷入口
+							<Wifi size={18} /> 连接与城市
 						</span>
-						<small>{quickFavorites.length} 个收藏，显示在首页搜索下方</small>
 					</div>
-					<div className="quick-settings-grid">
-						{quickActions.map((action) => {
-							const Icon = action.icon;
-							const active = favoriteQuickSet.has(action.id);
-							return (
+					<div className="settings-grid connection-grid">
+						<div className="api-base api-setting-row">
+							<span className="api-field-title">
+								<span>API 地址</span>
+								<a
+									className="settings-inline-link"
+									href={API_DOCS_URL}
+									target="_blank"
+									rel="noreferrer"
+								>
+									公共实例列表 <ExternalLink size={13} />
+								</a>
+							</span>
+							<span className="api-control-row">
+								<input
+									value={apiDraft}
+									onChange={(event) => {
+										setApiDraft(event.target.value);
+										setApiCheck({ status: "idle", message: "" });
+									}}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") {
+											event.preventDefault();
+											saveApiBase();
+										}
+									}}
+									placeholder="example.com/v2"
+								/>
 								<button
 									type="button"
-									key={action.id}
-									className={active ? "active" : ""}
-									onClick={() => toggleQuickFavorite(action)}
-									aria-pressed={active}
+									className="outline-button"
+									onClick={saveApiBase}
+									disabled={apiCheck.status === "checking"}
 								>
-									{Icon ? (
-										<Icon size={19} />
-									) : (
-										<i className={`chip-symbol ${action.symbolTone || ""}`}>
-											{action.symbol}
-										</i>
-									)}
-									<span>
-										<b>{action.label}</b>
-										<small>{action.sub}</small>
-									</span>
-									<Star size={16} className="quick-star" />
+									保存
 								</button>
-							);
-						})}
-					</div>
-					{onResetQuickFavorites && (
-						<button
-							type="button"
-							className="quick-reset-button"
-							onClick={onResetQuickFavorites}
-						>
-							<RotateCcw size={16} /> 恢复默认快捷入口
-						</button>
-					)}
-				</div>
-			)}
-			{!compact && onExportConfig && onImportConfig && onResetConfig && (
-				<div className="config-settings">
-					<div className="settings-subtitle">
-						<span>
-							<FileUp size={18} /> 配置管理
-						</span>
-						<small>导出不包含头像、QQ 号和自定义壁纸图片</small>
-					</div>
-					<div className="config-action-grid">
-						<button type="button" onClick={exportConfig}>
-							<Download size={18} />
-							<span>
-								<b>导出配置</b>
-								<small>保存当前偏好</small>
+								<button
+									type="button"
+									className="outline-button"
+									onClick={checkApiConnection}
+									disabled={apiCheck.status === "checking"}
+								>
+									{apiCheck.status === "checking" ? (
+										<Loader2 className="spin" size={16} />
+									) : (
+										<Wifi size={16} />
+									)}
+									检测
+								</button>
 							</span>
-						</button>
-						<button
-							type="button"
-							onClick={() => configInputRef.current?.click()}
-						>
-							<FileUp size={18} />
-							<span>
-								<b>导入配置</b>
-								<small>从 JSON 恢复</small>
-							</span>
-						</button>
-						<button type="button" className="danger" onClick={resetConfig}>
-							<RotateCcw size={18} />
-							<span>
-								<b>恢复默认</b>
-								<small>清理本地缓存</small>
-							</span>
-						</button>
-					</div>
-					<input
-						ref={configInputRef}
-						type="file"
-						accept="application/json,.json"
-						hidden
-						onChange={(event) => {
-							importConfigFile(event.target.files?.[0]);
-							event.currentTarget.value = "";
-						}}
-					/>
-					{configNotice && (
-						<p
-							className={`config-notice ${
-								configNotice.ok ? "success" : "error"
-							}`}
-							role="status"
-						>
-							{configNotice.ok ? (
-								<CheckCircle2 size={16} />
-							) : (
-								<AlertTriangle size={16} />
+							{showApiVersionWarning && (
+								<span className="settings-notice warning">
+									<AlertTriangle size={15} />
+									API 地址通常需要带版本后缀，例如 /v2
+									<button
+										type="button"
+										aria-label="关闭版本后缀提示"
+										onClick={() => setHiddenApiWarningValue(trimmedApiDraft)}
+									>
+										<X size={14} />
+									</button>
+								</span>
 							)}
-							{configNotice.message}
-						</p>
-					)}
-				</div>
+							{apiCheck.message && (
+								<span className={`settings-notice ${apiCheck.status}`}>
+									{apiCheck.status === "success" ? (
+										<CheckCircle2 size={15} />
+									) : apiCheck.status === "checking" ? (
+										<Loader2 className="spin" size={15} />
+									) : (
+										<AlertTriangle size={15} />
+									)}
+									{apiCheck.message}
+								</span>
+							)}
+						</div>
+						{city !== undefined && setCity && (
+							<label className="api-base city-setting">
+								默认城市
+								<input
+									value={city}
+									onChange={(event) => setCity(event.target.value)}
+									placeholder="例如 上海"
+								/>
+							</label>
+						)}
+					</div>
+				</section>
 			)}
+
+			{!compact &&
+				settingsSection === "appearance" &&
+				wallpaper &&
+				setWallpaper && (
+					<section className="settings-section">
+						<div className="settings-section-head">
+							<span>
+								<Palette size={18} /> 外观与布局
+							</span>
+						</div>
+						{colorTheme && setColorTheme && (
+							<>
+								<div className="settings-subtitle first-subtitle">
+									<span>
+										{colorTheme === "dark" ? (
+											<Moon size={18} />
+										) : (
+											<Sun size={18} />
+										)}
+										明暗
+									</span>
+								</div>
+								<div className="color-theme-grid">
+									{colorThemes.map((theme) => (
+										<button
+											type="button"
+											key={theme.id}
+											className={colorTheme === theme.id ? "active" : ""}
+											onClick={() => setColorTheme(theme.id)}
+										>
+											<i className={`color-preview color-preview-${theme.id}`}>
+												<span />
+												<b />
+											</i>
+											<span>
+												<b>{theme.label}</b>
+												<small>{theme.sub}</small>
+											</span>
+										</button>
+									))}
+								</div>
+							</>
+						)}
+						{accentTheme && setAccentTheme && (
+							<>
+								<div className="settings-subtitle">
+									<span>
+										<Palette size={18} /> 主题色
+									</span>
+								</div>
+								<div className="accent-theme-grid">
+									{accentThemes.map((theme) => (
+										<button
+											type="button"
+											key={theme.id}
+											className={accentTheme.mode === theme.id ? "active" : ""}
+											onClick={() => setAccentTheme({ mode: theme.id })}
+										>
+											<i
+												className="accent-preview"
+												style={{ backgroundColor: theme.primary }}
+											/>
+											<span>
+												<b>{theme.label}</b>
+												<small>{theme.sub}</small>
+											</span>
+										</button>
+									))}
+									<label
+										className={`accent-custom-field ${
+											accentTheme.mode === "custom" ? "active" : ""
+										}`}
+									>
+										<input
+											type="color"
+											value={
+												accentTheme.mode === "custom"
+													? accentTheme.color || "#0f8f7f"
+													: "#0f8f7f"
+											}
+											onChange={(event) =>
+												setAccentTheme({
+													mode: "custom",
+													color: event.target.value,
+												})
+											}
+										/>
+										<span>
+											<b>自定义</b>
+											<small>选择任意主色</small>
+										</span>
+									</label>
+								</div>
+							</>
+						)}
+						{chromeTheme && setChromeTheme && (
+							<>
+								<div className="settings-subtitle">
+									<span>
+										<LayoutGrid size={18} /> 桌面布局
+									</span>
+								</div>
+								<div className="chrome-theme-grid">
+									{chromeThemes.map((theme) => (
+										<button
+											type="button"
+											key={theme.id}
+											className={chromeTheme === theme.id ? "active" : ""}
+											onClick={() => setChromeTheme(theme.id)}
+										>
+											<i className={`chrome-preview chrome-preview-${theme.id}`}>
+												<span />
+												<b />
+											</i>
+											<span>
+												<b>{theme.label}</b>
+												<small>{theme.sub}</small>
+											</span>
+										</button>
+									))}
+								</div>
+							</>
+						)}
+						<div className="settings-subtitle">
+							<span>
+								<ImageIcon size={18} /> 背景
+							</span>
+						</div>
+						<div className="wallpaper-grid">
+							{wallpaperOptions.map((option) => (
+								<button
+									type="button"
+									key={option.id}
+									className={wallpaper.mode === option.id ? "active" : ""}
+									onClick={() => {
+										if (option.id === "custom") {
+											wallpaperInputRef.current?.click();
+											return;
+										}
+										setWallpaper({ mode: option.id });
+									}}
+								>
+									<i className={`wallpaper-preview wallpaper-${option.id}`}>
+										{option.id === "custom" && wallpaper.src ? (
+											<img src={wallpaper.src} alt="" />
+										) : null}
+									</i>
+									<span>
+										<b>{option.label}</b>
+										<small>{option.sub}</small>
+									</span>
+								</button>
+							))}
+						</div>
+						<input
+							ref={wallpaperInputRef}
+							type="file"
+							accept="image/*"
+							hidden
+							onChange={(event) => handleWallpaperFile(event.target.files?.[0])}
+						/>
+						{wallpaper.mode === "custom" && (
+							<div className="wallpaper-controls">
+								{[
+									{
+										key: "imageOpacity" as const,
+										label: "图片强度",
+										fallback: 0.78,
+									},
+									{
+										key: "overlayOpacity" as const,
+										label: "遮罩",
+										fallback: 0.48,
+									},
+									{
+										key: "chromeOpacity" as const,
+										label: "顶栏",
+										fallback: 0.68,
+									},
+									{
+										key: "surfaceOpacity" as const,
+										label: "面板",
+										fallback: 0.72,
+									},
+								].map((control) => {
+									const value = readWallpaperNumber(
+										control.key,
+										control.fallback,
+									);
+									return (
+										<label className="range-row" key={control.key}>
+											<span>{control.label}</span>
+											<input
+												type="range"
+												min="0"
+												max="1"
+												step="0.05"
+												value={value}
+												onChange={(event) =>
+													updateWallpaper({
+														[control.key]: Number(event.target.value),
+													})
+												}
+											/>
+											<b>{formatPercent(value)}</b>
+										</label>
+									);
+								})}
+								<label className="range-row">
+									<span>模糊</span>
+									<input
+										type="range"
+										min="0"
+										max="12"
+										step="1"
+										value={Math.min(Math.max(wallpaper.blur ?? 0, 0), 12)}
+										onChange={(event) =>
+											updateWallpaper({ blur: Number(event.target.value) })
+										}
+									/>
+									<b>{Math.min(Math.max(wallpaper.blur ?? 0, 0), 12)}px</b>
+								</label>
+							</div>
+						)}
+					</section>
+				)}
+
+			{!compact && settingsSection === "preferences" && (
+				<section className="settings-section">
+					<div className="settings-section-head">
+						<span>
+							<SlidersHorizontal size={18} /> 偏好
+						</span>
+					</div>
+					{settings && setSettings && (
+						<div className="module-toggle-grid">
+							{moduleToggles.map(([key, label]) => (
+								<label className="switch-row" key={key}>
+									<span>{label}</span>
+									<input
+										type="checkbox"
+										checked={settings[key]}
+										onChange={(event) =>
+											setSettings({ ...settings, [key]: event.target.checked })
+										}
+									/>
+								</label>
+							))}
+						</div>
+					)}
+					{hotBoardPreferences && setHotBoardPreferences && (
+						<>
+							<div className="settings-subtitle">
+								<span>
+									<LayoutGrid size={18} /> 热榜源
+								</span>
+							</div>
+							<div className="hot-source-grid">
+								{hotBoards.map((board) => {
+									const active = selectedHotBoardSet.has(board.id);
+									return (
+										<button
+											type="button"
+											key={board.id}
+											className={active ? "active" : ""}
+											aria-pressed={active}
+											onClick={() => toggleHotBoard(board.id)}
+										>
+											<span>{board.title}</span>
+											<small>{board.path}</small>
+										</button>
+									);
+								})}
+							</div>
+						</>
+					)}
+					{quickFavorites && setQuickFavorites && (
+						<>
+							<div className="settings-subtitle">
+								<span>
+									<Star size={18} /> 搜索下方快捷入口
+								</span>
+								<small>{quickFavorites.length} 个收藏</small>
+							</div>
+							<div className="quick-settings-grid">
+								{quickActions.map((action) => {
+									const Icon = action.icon;
+									const active = favoriteQuickSet.has(action.id);
+									return (
+										<button
+											type="button"
+											key={action.id}
+											className={active ? "active" : ""}
+											onClick={() => toggleQuickFavorite(action)}
+											aria-pressed={active}
+										>
+											{Icon ? (
+												<Icon size={19} />
+											) : (
+												<i className={`chip-symbol ${action.symbolTone || ""}`}>
+													{action.symbol}
+												</i>
+											)}
+											<span>
+												<b>{action.label}</b>
+												<small>{action.sub}</small>
+											</span>
+											<Star size={16} className="quick-star" />
+										</button>
+									);
+								})}
+							</div>
+						</>
+					)}
+				</section>
+			)}
+
+			{!compact &&
+				settingsSection === "data" &&
+				onExportConfig &&
+				onImportConfig &&
+				onResetConfig && (
+					<section className="settings-section">
+						<div className="settings-section-head">
+							<span>
+								<FileUp size={18} /> 数据与配置
+							</span>
+						</div>
+						<div className="config-action-grid">
+							<button type="button" onClick={exportConfig}>
+								<Download size={18} />
+								<span>
+									<b>导出配置</b>
+									<small>保存当前偏好</small>
+								</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => configInputRef.current?.click()}
+							>
+								<FileUp size={18} />
+								<span>
+									<b>导入配置</b>
+									<small>从 JSON 恢复</small>
+								</span>
+							</button>
+							<button type="button" className="danger" onClick={resetConfig}>
+								<RotateCcw size={18} />
+								<span>
+									<b>恢复默认</b>
+									<small>清理本地缓存</small>
+								</span>
+							</button>
+						</div>
+						<input
+							ref={configInputRef}
+							type="file"
+							accept="application/json,.json"
+							hidden
+							onChange={(event) => {
+								importConfigFile(event.target.files?.[0]);
+								event.currentTarget.value = "";
+							}}
+						/>
+						{configNotice && (
+							<p
+								className={`config-notice ${
+									configNotice.ok ? "success" : "error"
+								}`}
+								role="status"
+							>
+								{configNotice.ok ? (
+									<CheckCircle2 size={16} />
+								) : (
+									<AlertTriangle size={16} />
+								)}
+								{configNotice.message}
+							</p>
+						)}
+						<div className="config-action-grid github-link-grid">
+							<a href={WEB_REPO_URL} target="_blank" rel="noreferrer">
+								<Github size={18} />
+								<span>
+									<b>60s-web</b>
+									<small>前端项目</small>
+								</span>
+							</a>
+						</div>
+					</section>
+				)}
 		</article>
 	);
 }
@@ -584,10 +866,10 @@ export function HomeModuleSettings({
 	const [apiDraft, setApiDraft] = useState(apiBase);
 	const [apiNotice, setApiNotice] = useState("");
 	const toggles: Array<[keyof SettingsState, string]> = [
+		["showSearch", "显示搜索栏"],
 		["showWeather", "显示天气"],
 		["showHot", "显示热榜"],
 		["showNews", "显示新闻"],
-		["autoRefresh", "自动刷新"],
 	];
 
 	useEffect(() => {

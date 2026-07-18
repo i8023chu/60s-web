@@ -69,24 +69,3 @@ export function applyServiceWorkerUpdate(
 ) {
 	registration?.waiting?.postMessage({ type: "SKIP_WAITING" });
 }
-
-export function isStandaloneDisplay() {
-	if (typeof window === "undefined") return false;
-	return (
-		window.matchMedia("(display-mode: standalone)").matches ||
-		Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone)
-	);
-}
-
-export function shouldShowIosInstallHint() {
-	if (typeof window === "undefined") return false;
-	const userAgent = window.navigator.userAgent;
-	const isIos =
-		/iPad|iPhone|iPod/.test(userAgent) ||
-		(window.navigator.platform === "MacIntel" &&
-			window.navigator.maxTouchPoints > 1);
-	const isSafari =
-		/Safari/.test(userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(userAgent);
-
-	return isIos && isSafari && !isStandaloneDisplay();
-}

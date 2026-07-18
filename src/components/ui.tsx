@@ -1,13 +1,14 @@
 import {
+	AlertCircle,
 	CheckCircle2,
+	CircleDashed,
 	Github,
-	Globe2,
 	Loader2,
 	Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import packageInfo from "../../package.json";
-import { API_REPO_URL, WEB_REPO_URL } from "../config";
+import { WEB_REPO_URL } from "../config";
 import type { ApiState } from "../types";
 import { weatherIconType } from "../utils";
 
@@ -31,12 +32,10 @@ export function CardTitle({
 	);
 }
 
-export function EmptyState({ title, desc }: { title: string; desc: string }) {
+export function EmptyState(_props: { title: string; desc: string }) {
 	return (
-		<div className="empty-state" role="status">
+		<div className="empty-state" aria-hidden="true">
 			<Sparkles size={20} />
-			<b>{title}</b>
-			<small>{desc}</small>
 		</div>
 	);
 }
@@ -44,17 +43,26 @@ export function EmptyState({ title, desc }: { title: string; desc: string }) {
 export function Status({ state }: { state: ApiState<unknown> }) {
 	if (state.loading)
 		return (
-			<span className="status loading">
-				<Loader2 className="spin" size={15} /> 同步中
+			<span className="status icon-status loading" aria-label="同步中" title="同步中">
+				<Loader2 className="spin" size={15} />
 			</span>
 		);
-	if (state.error) return <span className="status error">失败</span>;
+	if (state.error)
+		return (
+			<span className="status icon-status error" aria-label="同步失败" title="同步失败">
+				<AlertCircle size={15} />
+			</span>
+		);
 	if (state.data === undefined && !state.updatedAt) {
-		return <span className="status">未同步</span>;
+		return (
+			<span className="status icon-status idle" aria-label="未同步" title="未同步">
+				<CircleDashed size={15} />
+			</span>
+		);
 	}
 	return (
-		<span className="status">
-			<CheckCircle2 size={15} /> 已同步
+		<span className="status icon-status" aria-label="已同步" title="已同步">
+			<CheckCircle2 size={15} />
 		</span>
 	);
 }
@@ -119,54 +127,28 @@ export function Footer({
 				<div className="footer-left">
 					<a
 						className="footer-text-link brand-link"
-						href={API_REPO_URL}
-						target="_blank"
-						rel="noreferrer"
-					>
-						<img src="/favicon.png" alt="60s logo" width={18} height={18} />
-						<strong>60s</strong>
-						<small>API</small>
-						<Github size={15} />
-					</a>
-					<span className="footer-separator" />
-					<a
-						className="footer-text-link brand-link"
 						href={WEB_REPO_URL}
 						target="_blank"
 						rel="noreferrer"
 					>
-						<Github size={18} />
-						<strong>60s-web</strong>
-						<small>Web</small>
+						<Github size={14} />
+						60s-web
 					</a>
-					<span className="footer-separator" />
-					<span className="footer-meta api-link">
-						<Globe2 size={16} />
-						{apiBase ? apiBase.replace(/^https?:\/\//, "") : "未配置 API"}
-					</span>
+					{apiBase && (
+						<>
+							<span className="footer-separator" />
+							<span className="footer-meta api-link">
+								{apiBase.replace(/^https?:\/\//, "")}
+							</span>
+						</>
+					)}
 				</div>
 				<div className="footer-right">
-					<span className={`footer-meta ${isOffline ? "error" : "ok"}`}>
-						<strong>状态</strong>
-						{isOffline ? "离线" : "正常"}
-					</span>
-					<span className="footer-dot" />
 					<span className="footer-meta version">
-						<strong>版本</strong>v{packageInfo.version}
+						v{packageInfo.version}
 					</span>
 					<span className="footer-dot" />
 					<span className="footer-meta">
-						<strong>PWA</strong>
-						可安装
-					</span>
-					<span className="footer-dot" />
-					<span className="footer-meta runtime">
-						<strong>缓存</strong>
-						10 分钟
-					</span>
-					<span className="footer-dot" />
-					<span className="footer-meta">
-						<strong>最近同步</strong>
 						{updatedAt
 							? updatedAt.toLocaleTimeString("zh-CN", {
 									hour: "2-digit",
@@ -174,6 +156,7 @@ export function Footer({
 								})
 							: "--:--"}
 					</span>
+					{isOffline && <span className="footer-meta error">离线</span>}
 				</div>
 			</div>
 		</footer>

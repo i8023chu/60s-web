@@ -14,6 +14,10 @@ type RequestResult<T> = {
 	updatedAt: number;
 };
 
+type ScopedApiState<T> = ApiState<T> & {
+	cacheKey: string;
+};
+
 const inFlightRequests = new Map<string, Promise<RequestResult<unknown>>>();
 
 function requestWithDedupe<T>(
@@ -59,20 +63,24 @@ export function useApi<T>(
 		() => (requestUrl ? `60s-web:cache:${requestUrl}` : ""),
 		[requestUrl],
 	);
-	const [state, setState] = useState<ApiState<T>>(() => {
-		if (!enabled || typeof window === "undefined") return { loading: enabled };
+	const [state, setState] = useState<ScopedApiState<T>>(() => {
+		if (!enabled || typeof window === "undefined") {
+			return { loading: enabled, cacheKey };
+		}
 		if (!requestUrl) {
 			return {
 				loading: false,
 				error: getApiBaseError(base) || "API 地址无效",
+				cacheKey,
 			};
 		}
 		const cached = readCache<T>(cacheKey);
-		if (!cached) return { loading: true };
+		if (!cached) return { loading: true, cacheKey };
 		return {
 			data: cached.data,
 			loading: false,
 			updatedAt: new Date(cached.updatedAt),
+			cacheKey,
 		};
 	});
 
@@ -83,6 +91,7 @@ export function useApi<T>(
 				setState({
 					loading: false,
 					error: getApiBaseError(base) || "API 地址无效",
+					cacheKey,
 				});
 				return;
 			}
@@ -94,12 +103,13 @@ export function useApi<T>(
 						loading: false,
 						error: undefined,
 						updatedAt: new Date(cached.updatedAt),
+						cacheKey,
 					});
 					return;
 				}
 			}
 
-			setState((current) => ({ ...current, loading: true, error: undefined }));
+			setState({ loading: true, error: undefined, cacheKey });
 			try {
 				const { data, updatedAt } = await requestWithDedupe<T>(
 					cacheKey,
@@ -111,12 +121,14 @@ export function useApi<T>(
 					data,
 					loading: false,
 					updatedAt: new Date(updatedAt),
+					cacheKey,
 				});
 			} catch (error) {
 				setState((current) => ({
 					...current,
 					loading: false,
 					error: error instanceof Error ? error.message : "请求失败",
+					cacheKey,
 				}));
 			}
 		},
@@ -143,6 +155,15 @@ export function useApi<T>(
 	}, [autoRefresh, enabled, load]);
 
 	const reload = useCallback(() => load(true), [load]);
+	const scopedState: ApiState<T> =
+		state.cacheKey === cacheKey
+			? state
+			: requestUrl
+				? { loading: enabled }
+				: {
+						loading: false,
+						error: getApiBaseError(base) || "API 地址无效",
+					};
 
-	return { ...state, reload };
+	return { ...scopedState, reload };
 }

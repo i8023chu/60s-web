@@ -1,8 +1,8 @@
-import { Flame, RefreshCw } from "lucide-react";
+import { Flame } from "lucide-react";
 import { formatHotValue, type HotItem, toItems } from "../api";
-import { hotTabs } from "../config";
+import { hotBoards, hotTabs } from "../config";
 import { useApi } from "../hooks/useApi";
-import type { ApiState } from "../types";
+import type { ApiState, HotBoardId } from "../types";
 import { skeletonItems } from "../utils";
 import { CardTitle, EmptyState, Status } from "./ui";
 
@@ -10,34 +10,29 @@ function getHotTitle(item: HotItem, fallback: string) {
 	return item.title || item.name || item.movie_name || fallback;
 }
 
+function getHotMetric(item: HotItem) {
+	return formatHotValue(item.hot_value ?? item.hot ?? item.heat ?? item.score);
+}
+
 export function HotPage({
 	apiBase,
+	visibleHotBoardIds,
 }: {
 	apiBase: string;
+	visibleHotBoardIds: HotBoardId[];
 }) {
 	const apiReady = Boolean(apiBase.trim());
-	const hotBoards = [
-		{ title: "微博热搜", path: "/weibo" },
-		{ title: "知乎热榜", path: "/zhihu" },
-		{ title: "B站热榜", path: "/bili" },
-		{ title: "抖音热搜", path: "/douyin" },
-		{ title: "头条热榜", path: "/toutiao" },
-		{ title: "百度热搜", path: "/baidu/hot" },
-		{ title: "小红书热点", path: "/rednote" },
-		{ title: "Hacker News", path: "/hacker-news/top", params: { limit: "12" } },
-	];
+	const visibleBoardSet = new Set(visibleHotBoardIds);
+	const displayBoards = hotBoards.filter((board) =>
+		visibleBoardSet.has(board.id),
+	);
 
 	return (
 		<section className="page-stack">
-			<div className="page-title">
-				<span>
-					<Flame size={24} /> 热榜广场
-				</span>
-			</div>
 			<div className="multi-board-grid">
-				{hotBoards.map((board) => (
+				{displayBoards.map((board) => (
 					<HotMiniBoard
-						key={board.path}
+						key={board.id}
 						apiBase={apiBase}
 						title={board.title}
 						path={board.path}
@@ -81,19 +76,20 @@ function HotMiniBoard({
 			/>
 			{isEmpty ? (
 				<EmptyState
-					title={isIdle ? "请先配置 API" : "暂无热榜数据"}
-					desc={
-						isIdle
-							? "填入 API 地址后，这个榜单才会开始同步。"
-							: "上游返回了空列表，稍后刷新即可。"
-					}
+					title={isIdle ? "暂无内容" : "暂无热榜数据"}
+					desc={isIdle ? "" : "暂无热榜数据"}
 				/>
 			) : (
 				<ol className="rank-list compact-rank">
 					{displayItems.map((item, index) => {
 						const titleText = getHotTitle(item, "正在读取...");
+						const hotMetric = getHotMetric(item);
 						return (
-							<li key={`${titleText}-${index}`} data-rank-title={titleText}>
+							<li
+								key={`${titleText}-${index}`}
+								className={hotMetric ? undefined : "no-hot-value"}
+								data-rank-title={titleText}
+							>
 								<b>{index + 1}</b>
 								<a
 									href={item.link || item.url || "#"}
@@ -103,11 +99,7 @@ function HotMiniBoard({
 								>
 									{titleText}
 								</a>
-								<span>
-									{formatHotValue(
-										item.hot_value ?? item.hot ?? item.heat ?? item.score,
-									)}
-								</span>
+								{hotMetric && <span>{hotMetric}</span>}
 							</li>
 						);
 					})}
@@ -125,7 +117,7 @@ export function HotBoard({
 	items,
 	wide = false,
 }: {
-	tabs: typeof hotTabs;
+	tabs: Array<(typeof hotTabs)[number]>;
 	active: string;
 	setActive: (tab: (typeof hotTabs)[number]) => void;
 	state: ApiState<unknown> & { reload: () => void };
@@ -145,15 +137,7 @@ export function HotBoard({
 			<CardTitle
 				icon={<Flame size={22} />}
 				title="全网热榜"
-				right={
-					<button
-						className="ghost-button"
-						onClick={state.reload}
-						disabled={isIdle}
-					>
-						<RefreshCw size={16} /> 刷新缓存
-					</button>
-				}
+				right={<Status state={state} />}
 			/>
 			<div className="tabs">
 				{tabs.map((tab) => (
@@ -168,19 +152,20 @@ export function HotBoard({
 			</div>
 			{isEmpty ? (
 				<EmptyState
-					title={isIdle ? "请先配置 API" : "暂无热榜数据"}
-					desc={
-						isIdle
-							? "填入 API 地址后，热榜会自动同步。"
-							: "接口返回了空列表，不再假装加载中。可以手动刷新或切换榜单。"
-					}
+					title={isIdle ? "暂无内容" : "暂无热榜数据"}
+					desc={isIdle ? "" : "暂无热榜数据"}
 				/>
 			) : (
 				<ol className="rank-list">
 					{displayItems.map((item, index) => {
 						const titleText = getHotTitle(item, "正在读取热榜...");
+						const hotMetric = getHotMetric(item);
 						return (
-							<li key={`${titleText}-${index}`} data-rank-title={titleText}>
+							<li
+								key={`${titleText}-${index}`}
+								className={hotMetric ? undefined : "no-hot-value"}
+								data-rank-title={titleText}
+							>
 								<b>{index + 1}</b>
 								<a
 									href={item.link || item.url || "#"}
@@ -190,11 +175,7 @@ export function HotBoard({
 								>
 									{titleText}
 								</a>
-								<span>
-									{formatHotValue(
-										item.hot_value ?? item.hot ?? item.heat ?? item.score,
-									)}
-								</span>
+								{hotMetric && <span>{hotMetric}</span>}
 							</li>
 						);
 					})}
