@@ -9,7 +9,7 @@ import { accentThemes } from "./config";
 import type {
 	AccentThemeState,
 	AvatarState,
-	ColorTheme,
+	ResolvedColorTheme,
 	SearchProviderId,
 	WallpaperState,
 } from "./types";
@@ -122,7 +122,7 @@ export function buildSearchTarget(provider: SearchProviderId, keyword: string) {
 
 export function getWallpaperStyle(
 	wallpaper: WallpaperState,
-	colorTheme: ColorTheme,
+	colorTheme: ResolvedColorTheme,
 ): CSSProperties {
 	const dark = colorTheme === "dark";
 	if (wallpaper.mode === "custom" && wallpaper.src) {

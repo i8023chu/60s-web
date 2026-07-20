@@ -42,7 +42,8 @@ export type QuickFavoriteId =
 	| "tool-palette";
 export type WallpaperMode = "default" | "mint" | "paper" | "dawn" | "custom";
 export type ChromeTheme = "classic" | "floating" | "single";
-export type ColorTheme = "light" | "dark";
+export type ResolvedColorTheme = "light" | "dark";
+export type ColorTheme = ResolvedColorTheme | "system";
 export type AccentThemeMode = "green" | "blue" | "coral" | "violet" | "custom";
 export type MobileNavMode = "auto" | "bottom" | "top";
 

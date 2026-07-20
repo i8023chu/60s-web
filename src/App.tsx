@@ -76,6 +76,7 @@ import type {
 	PageId,
 	QuickActionDefinition,
 	QuickFavoriteId,
+	ResolvedColorTheme,
 	SearchProviderId,
 	SettingsState,
 	ToolId,
@@ -94,7 +95,7 @@ import {
 const DEFAULT_CITY = "上海";
 const DEFAULT_SEARCH_PROVIDER: SearchProviderId = "bing";
 const DEFAULT_CHROME_THEME: ChromeTheme = "classic";
-const DEFAULT_COLOR_THEME: ColorTheme = "light";
+const DEFAULT_COLOR_THEME: ColorTheme = "system";
 const DEFAULT_ACCENT_THEME: AccentThemeState = { mode: "green" };
 const DEFAULT_MOBILE_NAV_MODE: MobileNavMode = "auto";
 const DEFAULT_SETTINGS_STATE: SettingsState = {
@@ -108,6 +109,7 @@ const DEFAULT_AVATAR_STATE: AvatarState = { mode: "default" };
 const DEFAULT_WALLPAPER_STATE: WallpaperState = { mode: "default" };
 const CONFIG_EXPORT_VERSION = 2;
 const PAGE_IDS: PageId[] = ["home", "hot", "news", "weather", "tools", "settings"];
+const IP_CITY_ENDPOINT = "https://ipwho.is/?lang=zh-CN";
 
 type ConfigActionResult = {
 	ok: boolean;
@@ -200,6 +202,14 @@ function readString(value: unknown, fallback: string) {
 	return typeof value === "string" ? value : fallback;
 }
 
+function getIpLocationCity(payload: unknown) {
+	if (!isRecord(payload) || payload.success === false) return "";
+	const city =
+		readString(payload.city, "").trim() || readString(payload.region, "").trim();
+	if (!city || city.length > 32) return "";
+	return city.replace(/市$/, "");
+}
+
 function readBoolean(value: unknown, fallback: boolean, label: string) {
 	if (value === undefined) return fallback;
 	if (typeof value !== "boolean") {
@@ -223,6 +233,19 @@ function normalizeChromeTheme(value: unknown): ChromeTheme {
 	if (value === "single") return "single";
 	if (value === "floating") return "floating";
 	return "classic";
+}
+
+function getSystemColorTheme(): ResolvedColorTheme {
+	if (typeof window === "undefined" || !window.matchMedia) return "light";
+	return window.matchMedia("(prefers-color-scheme: dark)").matches
+		? "dark"
+		: "light";
+}
+
+function normalizeColorTheme(value: unknown): ColorTheme {
+	return colorThemes.some((theme) => theme.id === value)
+		? (value as ColorTheme)
+		: DEFAULT_COLOR_THEME;
 }
 
 function normalizePageId(value: unknown): PageId {
@@ -395,6 +418,11 @@ function parseImportedConfig(raw: string): ExportedSettings {
 }
 
 export function App() {
+	const shouldAutoDetectCity = useRef(
+		typeof window !== "undefined" &&
+			!window.localStorage.getItem(STORAGE_KEYS.city) &&
+			!window.localStorage.getItem(STORAGE_KEYS.cityAutoDetected),
+	);
 	const [apiBase, setApiBase] = useState(readInitialApiBase);
 	const [city, setCity] = useState(() =>
 		readStoredValue(STORAGE_KEYS.city, DEFAULT_CITY),
@@ -418,9 +446,13 @@ export function App() {
 		)),
 	);
 	const [colorTheme, setColorTheme] = useState<ColorTheme>(
-		() =>
-			readStoredValue(STORAGE_KEYS.colorTheme, DEFAULT_COLOR_THEME) as ColorTheme,
+		() => normalizeColorTheme(readStoredValue(
+			STORAGE_KEYS.colorTheme,
+			DEFAULT_COLOR_THEME,
+		)),
 	);
+	const [systemColorTheme, setSystemColorTheme] =
+		useState<ResolvedColorTheme>(getSystemColorTheme);
 	const [accentTheme, setAccentTheme] = useState<AccentThemeState>(() =>
 		normalizeAccentTheme(
 			readStoredJson(STORAGE_KEYS.accentTheme, DEFAULT_ACCENT_THEME),
@@ -478,6 +510,8 @@ export function App() {
 	});
 	const hasApiBase = Boolean(apiBase.trim());
 	const hasSearchQuery = Boolean(query.trim());
+	const resolvedColorTheme =
+		colorTheme === "system" ? systemColorTheme : colorTheme;
 	const visibleHotTabs = useMemo(() => {
 		const preferenceSet = new Set(hotBoardPreferences);
 		return hotTabs.filter((tab) =>
@@ -590,6 +624,42 @@ export function App() {
 	}, [apiBase]);
 
 	useEffect(() => {
+		if (!shouldAutoDetectCity.current) return;
+
+		let cancelled = false;
+		const controller = new AbortController();
+		const timeout = window.setTimeout(() => controller.abort(), 5000);
+
+		fetch(IP_CITY_ENDPOINT, { signal: controller.signal })
+			.then((response) => (response.ok ? response.json() : null))
+			.then((payload) => {
+				const detectedCity = getIpLocationCity(payload);
+				if (!detectedCity) return;
+				setCity((current) => {
+					const currentCity = current.trim();
+					if (currentCity && currentCity !== DEFAULT_CITY) return current;
+					return detectedCity;
+				});
+			})
+			.catch(() => {
+				// Location lookup is only a convenience; keep the default city on failure.
+			})
+			.finally(() => {
+				window.clearTimeout(timeout);
+				if (!cancelled) {
+					shouldAutoDetectCity.current = false;
+					writeStoredValue(STORAGE_KEYS.cityAutoDetected, "true");
+				}
+			});
+
+		return () => {
+			cancelled = true;
+			controller.abort();
+			window.clearTimeout(timeout);
+		};
+	}, []);
+
+	useEffect(() => {
 		writeStoredValue(STORAGE_KEYS.city, city);
 	}, [city]);
 
@@ -643,6 +713,15 @@ export function App() {
 	}, [colorTheme]);
 
 	useEffect(() => {
+		if (typeof window === "undefined" || !window.matchMedia) return;
+		const media = window.matchMedia("(prefers-color-scheme: dark)");
+		const syncSystemTheme = () => setSystemColorTheme(getSystemColorTheme());
+		syncSystemTheme();
+		media.addEventListener("change", syncSystemTheme);
+		return () => media.removeEventListener("change", syncSystemTheme);
+	}, []);
+
+	useEffect(() => {
 		writeStoredJson(STORAGE_KEYS.accentTheme, normalizeAccentTheme(accentTheme));
 	}, [accentTheme]);
 
@@ -664,7 +743,7 @@ export function App() {
 	useEffect(() => registerServiceWorker(setServiceWorkerUpdate), []);
 
 	useEffect(() => {
-		const themeColor = colorTheme === "dark" ? "#07100f" : "#ffffff";
+		const themeColor = resolvedColorTheme === "dark" ? "#07100f" : "#ffffff";
 		let meta = document.querySelector<HTMLMetaElement>(
 			'meta[name="theme-color"]',
 		);
@@ -674,7 +753,7 @@ export function App() {
 			document.head.appendChild(meta);
 		}
 		meta.content = themeColor;
-	}, [colorTheme]);
+	}, [resolvedColorTheme]);
 
 	useEffect(() => {
 		if (visibleHotTabs.some((tab) => tab.id === hotTab.id)) return;
@@ -817,9 +896,9 @@ export function App() {
 
 	return (
 		<div
-			className={`app-shell chrome-${chromeTheme} theme-${colorTheme} wallpaper-${wallpaper.mode}`}
+			className={`app-shell chrome-${chromeTheme} theme-${resolvedColorTheme} wallpaper-${wallpaper.mode}`}
 			style={{
-				...getWallpaperStyle(wallpaper, colorTheme),
+				...getWallpaperStyle(wallpaper, resolvedColorTheme),
 				...getAccentStyle(accentTheme),
 			}}
 		>
@@ -829,6 +908,7 @@ export function App() {
 				avatar={avatar}
 				setAvatar={setAvatar}
 				colorTheme={colorTheme}
+				resolvedColorTheme={resolvedColorTheme}
 				setColorTheme={setColorTheme}
 			/>
 			<PwaStatusBar
@@ -1091,7 +1171,7 @@ function ApiSetupGuide({
 							setDraft(event.target.value);
 							setError("");
 						}}
-						placeholder="https://example.com/v2"
+						placeholder="example.com/v2"
 						autoFocus
 					/>
 				</label>

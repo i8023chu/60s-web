@@ -36,6 +36,7 @@ export const CACHE_TTL = 60 * 60 * 1000;
 export const STORAGE_KEYS = {
 	apiBase: "60s-web:api-base",
 	city: "60s-web:city",
+	cityAutoDetected: "60s-web:city-auto-detected",
 	activePage: "60s-web:active-page",
 	settings: "60s-web:settings",
 	avatar: "60s-web:avatar",
@@ -221,6 +222,7 @@ export const colorThemes: Array<{
 	label: string;
 	sub: string;
 }> = [
+	{ id: "system", label: "系统", sub: "跟随设备" },
 	{ id: "light", label: "浅色", sub: "清爽白昼" },
 	{ id: "dark", label: "暗色", sub: "夜间低亮" },
 ];

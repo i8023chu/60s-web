@@ -8,6 +8,7 @@ import {
 	Image as ImageIcon,
 	LayoutGrid,
 	Loader2,
+	Monitor,
 	Moon,
 	Palette,
 	RotateCcw,
@@ -468,7 +469,9 @@ export function SettingsPanel({
 							<>
 								<div className="settings-subtitle first-subtitle">
 									<span>
-										{colorTheme === "dark" ? (
+										{colorTheme === "system" ? (
+											<Monitor size={18} />
+										) : colorTheme === "dark" ? (
 											<Moon size={18} />
 										) : (
 											<Sun size={18} />
@@ -621,8 +624,8 @@ export function SettingsPanel({
 									{
 										key: "imageOpacity" as const,
 										label: "图片强度",
-										fallback: 0.78,
-									},
+									fallback: 0.78,
+								},
 									{
 										key: "overlayOpacity" as const,
 										label: "遮罩",
@@ -936,15 +939,15 @@ export function HomeModuleSettings({
 									saveApiBase();
 								}
 							}}
-							placeholder="https://example.com/v2"
+							placeholder="example.com/v2"
 						/>
-							<button
-								type="button"
-								className="outline-button"
-								onClick={saveApiBase}
-							>
-								保存
-							</button>
+						<button
+							type="button"
+							className="outline-button"
+							onClick={saveApiBase}
+						>
+							保存
+						</button>
 						</span>
 						{apiNotice && (
 							<small className="api-inline-notice">{apiNotice}</small>

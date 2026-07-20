@@ -1,5 +1,6 @@
 import {
 	Menu,
+	Monitor,
 	Moon,
 	RotateCcw,
 	Save,
@@ -11,8 +12,18 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { nav } from "../config";
-import type { AvatarState, ColorTheme, PageId } from "../types";
+import type { AvatarState, ColorTheme, PageId, ResolvedColorTheme } from "../types";
 import { getAvatarSrc, getQqAvatarUrl } from "../utils";
+
+const themeChoices: Array<{
+	id: ColorTheme;
+	label: string;
+	icon: typeof Monitor;
+}> = [
+	{ id: "system", label: "系统", icon: Monitor },
+	{ id: "light", label: "浅色", icon: Sun },
+	{ id: "dark", label: "暗色", icon: Moon },
+];
 
 export function Header({
 	activePage,
@@ -20,6 +31,7 @@ export function Header({
 	avatar,
 	setAvatar,
 	colorTheme,
+	resolvedColorTheme,
 	setColorTheme,
 }: {
 	activePage: PageId;
@@ -27,6 +39,7 @@ export function Header({
 	avatar: AvatarState;
 	setAvatar: (avatar: AvatarState) => void;
 	colorTheme: ColorTheme;
+	resolvedColorTheme: ResolvedColorTheme;
 	setColorTheme: (theme: ColorTheme) => void;
 }) {
 	const [avatarOpen, setAvatarOpen] = useState(false);
@@ -204,18 +217,6 @@ export function Header({
 				>
 					<Settings size={18} />
 				</button>
-				<button
-					className="theme-toggle"
-					type="button"
-					aria-label={
-						colorTheme === "dark" ? "切换到浅色主题" : "切换到暗色主题"
-					}
-					onClick={() =>
-						setColorTheme(colorTheme === "dark" ? "light" : "dark")
-					}
-				>
-					{colorTheme === "dark" ? <Moon size={18} /> : <Sun size={18} />}
-				</button>
 				<div className="avatar-wrap" ref={avatarWrapRef}>
 					<button
 						className="avatar"
@@ -248,19 +249,6 @@ export function Header({
 								</button>
 								<button
 									type="button"
-									onClick={() =>
-										setColorTheme(colorTheme === "dark" ? "light" : "dark")
-									}
-								>
-									{colorTheme === "dark" ? (
-										<Moon size={15} />
-									) : (
-										<Sun size={15} />
-									)}
-									{colorTheme === "dark" ? "浅色" : "暗色"}
-								</button>
-								<button
-									type="button"
 									onClick={() => fileInputRef.current?.click()}
 								>
 									<Upload size={15} /> 上传
@@ -275,6 +263,29 @@ export function Header({
 								>
 									<RotateCcw size={15} /> 默认
 								</button>
+							</div>
+							<div className="avatar-theme-picker" aria-label="明暗主题">
+								{themeChoices.map((theme) => {
+									const Icon = theme.icon;
+									const active = colorTheme === theme.id;
+									return (
+										<button
+											key={theme.id}
+											type="button"
+											className={active ? "active" : ""}
+											aria-pressed={active}
+											title={
+												theme.id === "system"
+													? `跟随系统：当前${resolvedColorTheme === "dark" ? "暗色" : "浅色"}`
+													: theme.label
+											}
+											onClick={() => setColorTheme(theme.id)}
+										>
+											<Icon size={14} />
+											{theme.label}
+										</button>
+									);
+								})}
 							</div>
 							<input
 								ref={fileInputRef}
@@ -302,8 +313,8 @@ export function Header({
 									{avatarNotice}
 								</p>
 							)}
-						</div>
-					)}
+					</div>
+				)}
 				</div>
 			</div>
 		</header>
