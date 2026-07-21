@@ -176,7 +176,7 @@ export function WeatherCard({
 				<div
 					className="forecast-row"
 					style={{
-						gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))`,
+						gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(78px, 1fr))`,
 					}}
 				>
 					{days.map((day) => (

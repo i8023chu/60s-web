@@ -1153,7 +1153,7 @@ main {
 	padding: 0 18px 18px;
 	max-width: 100%;
 	min-width: 0;
-	overflow: hidden;
+	overflow: visible;
 }
 
 .weather-card.home-weather .weather-body {
@@ -1222,9 +1222,10 @@ main {
 
 .weather-art {
 	position: relative;
-	width: 86px;
-	height: 86px;
+	width: 92px;
+	height: 92px;
 	display: inline-block;
+	overflow: visible;
 }
 
 .weather-art.small {
@@ -1240,8 +1241,8 @@ main {
 .weather-art .sun-dot {
 	width: 46px;
 	height: 46px;
-	left: 3px;
-	top: 2px;
+	left: 10px;
+	top: 9px;
 	border-radius: 50%;
 	background: #ffc928;
 	box-shadow:
@@ -1258,16 +1259,16 @@ main {
 .weather-art .cloud-a {
 	width: 62px;
 	height: 42px;
-	right: 2px;
-	bottom: 10px;
+	right: 4px;
+	bottom: 12px;
 	border-radius: 28px;
 }
 
 .weather-art .cloud-b {
 	width: 46px;
 	height: 46px;
-	left: 18px;
-	bottom: 14px;
+	left: 24px;
+	bottom: 16px;
 	border-radius: 50%;
 }
 
@@ -1314,20 +1315,23 @@ main {
 .weather-art.small .sun-dot {
 	width: 18px;
 	height: 18px;
+	left: 4px;
+	top: 4px;
 	box-shadow: 0 0 0 3px rgba(255, 201, 40, 0.18);
 }
 
 .weather-art.small .cloud-a {
 	width: 25px;
 	height: 17px;
-	bottom: 4px;
+	right: 1px;
+	bottom: 5px;
 }
 
 .weather-art.small .cloud-b {
 	width: 18px;
 	height: 18px;
-	left: 8px;
-	bottom: 7px;
+	left: 9px;
+	bottom: 8px;
 }
 
 .weather-art.small .rain-a,
@@ -1436,6 +1440,10 @@ main {
 	margin-top: 14px;
 	max-width: 100%;
 	min-width: 0;
+	overflow-x: auto;
+	overflow-y: visible;
+	overscroll-behavior-x: contain;
+	-webkit-overflow-scrolling: touch;
 }
 
 .weather-card.home-weather .forecast-row {
@@ -1447,6 +1455,7 @@ main {
 	display: grid;
 	justify-items: center;
 	gap: 5px;
+	min-width: 78px;
 	min-height: 102px;
 	padding: 10px 6px;
 	border-radius: 10px;
@@ -3526,8 +3535,7 @@ footer strong {
 	color: var(--text);
 }
 
-.theme-dark .endpoint-list-item.active,
-.theme-dark .topbar nav button.active {
+.theme-dark .endpoint-list-item.active {
 	background: rgba(55, 216, 197, 0.12);
 	color: var(--accent-dark);
 }
@@ -3538,11 +3546,6 @@ footer strong {
 
 .theme-dark .ghost-button {
 	border: 1px solid var(--line);
-	background: var(--surface-soft);
-	color: var(--heading);
-}
-
-.theme-dark .topbar nav button {
 	background: var(--surface-soft);
 	color: var(--heading);
 }
@@ -3602,33 +3605,34 @@ footer strong {
 
 	.topbar nav {
 		width: auto;
-		height: 38px;
+		height: 100%;
 		justify-self: center;
 		justify-content: center;
-		gap: 3px;
-		padding: 3px;
-		border: 1px solid var(--line);
-		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.64);
+		gap: 2px;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: transparent;
 		overflow: visible;
 	}
 
 	.theme-dark .topbar nav {
-		background: rgba(14, 29, 27, 0.66);
+		background: transparent;
 	}
 
 	.topbar nav button {
-		width: 32px;
-		height: 30px;
+		width: auto;
+		height: 100%;
 		justify-content: center;
-		padding: 0;
+		padding: 0 8px;
 		border: 0;
-		border-radius: 999px;
+		border-bottom: 2px solid transparent;
+		border-radius: 0;
 	}
 
 	.topbar nav button.active {
-		background: rgba(15, 155, 142, 0.12);
-		border: 0;
+		background: transparent;
+		border-bottom-color: var(--accent);
 	}
 
 	.topbar nav button.active::after {
@@ -3636,7 +3640,7 @@ footer strong {
 	}
 
 	.topbar nav .nav-label {
-		display: none;
+		display: inline;
 	}
 
 	.header-actions {
@@ -3970,8 +3974,46 @@ footer strong {
 	}
 
 	.weather-art {
-		width: 64px;
-		height: 64px;
+		width: 68px;
+		height: 68px;
+	}
+
+	.weather-art:not(.small) .sun-dot {
+		width: 34px;
+		height: 34px;
+		left: 7px;
+		top: 7px;
+		box-shadow:
+			0 0 0 5px rgba(255, 201, 40, 0.18),
+			0 0 16px rgba(255, 201, 40, 0.46);
+	}
+
+	.weather-art:not(.small) .cloud-a {
+		width: 46px;
+		height: 31px;
+		right: 2px;
+		bottom: 8px;
+		border-radius: 22px;
+	}
+
+	.weather-art:not(.small) .cloud-b {
+		width: 34px;
+		height: 34px;
+		left: 18px;
+		bottom: 11px;
+	}
+
+	.weather-art:not(.small).rainy .rain-a,
+	.weather-art:not(.small).rainy .rain-b {
+		bottom: 2px;
+	}
+
+	.weather-art:not(.small).rainy .rain-a {
+		left: 32px;
+	}
+
+	.weather-art:not(.small).rainy .rain-b {
+		left: 46px;
 	}
 
 	.temperature strong {
@@ -5385,21 +5427,25 @@ footer {
 	}
 
 	.topbar nav {
-		height: 40px;
+		height: 100%;
 		padding: 0;
 		border: 0;
+		border-radius: 0;
 		background: transparent;
 	}
 
 	.topbar nav button {
-		width: 34px;
-		height: 34px;
+		width: auto;
+		height: 100%;
+		padding: 0 8px;
 		border: 0;
-		border-radius: 8px;
+		border-bottom: 2px solid transparent;
+		border-radius: 0;
 	}
 
 	.topbar nav button.active {
-		background: var(--surface-tint);
+		background: transparent;
+		border-bottom-color: var(--accent);
 	}
 
 	.home-layout,
@@ -5736,12 +5782,13 @@ footer {
 }
 
 .theme-dark .settings-nav {
-	background: var(--surface-soft);
+	background: transparent;
 }
 
 .theme-dark .settings-nav button.active {
-	background: #0d1117;
+	background: transparent;
 	color: var(--accent-dark);
+	box-shadow: none;
 }
 
 @media (max-width: 760px) {
@@ -6783,17 +6830,21 @@ main > .page-stack:first-child {
 
 @media (max-width: 760px) {
 	.hot-board .card-title,
+	.mini-hot-card .card-title,
 	.daily-card .card-title {
 		align-items: center;
 		flex-direction: row;
 	}
 
 	.hot-board .card-title > span,
+	.mini-hot-card .card-title > span,
 	.daily-card .card-title > span {
 		flex: 1 1 auto;
+		min-width: 0;
 	}
 
 	.hot-board .card-title > .status,
+	.mini-hot-card .card-title > .status,
 	.daily-actions {
 		flex: 0 0 auto;
 		margin-left: auto;
@@ -7462,6 +7513,58 @@ main > .page-stack:first-child {
 	}
 }
 
+/* Shared card spacing keeps plain, dark, and custom wallpaper layouts aligned. */
+.card:not(.settings-panel):not(.tool-panel),
+.page-stack > .endpoint-lab,
+.endpoint-lab,
+.quote-card {
+	padding: clamp(16px, 1.6vw, 22px);
+}
+
+.card:not(.settings-panel):not(.tool-panel),
+.page-stack > .endpoint-lab,
+.endpoint-lab,
+.tool-panel {
+	overflow: hidden;
+}
+
+.card-title {
+	margin-bottom: 12px;
+	padding: 0 0 12px;
+}
+
+.subline,
+.news-list,
+.rank-list,
+.tabs,
+.category-tabs,
+.market-grid,
+.weather-body,
+.weather-detail-grid,
+.hourly-row,
+.tool-grid,
+.favorite-grid,
+.entertainment-sections {
+	padding-right: 0;
+	padding-left: 0;
+}
+
+.subline {
+	padding-bottom: 12px;
+}
+
+.weather-card .weather-body {
+	padding: 0;
+}
+
+.metric {
+	min-height: 76px;
+	padding: 10px 12px;
+	border-left: 0;
+	border-radius: 10px;
+	box-shadow: none;
+}
+
 /* Custom wallpaper glass pass. */
 .app-shell.wallpaper-custom {
 	background: transparent;
@@ -7496,43 +7599,6 @@ main > .page-stack:first-child {
 
 .wallpaper-custom .settings-panel {
 	padding: 18px 22px 22px;
-}
-
-.wallpaper-custom .card,
-.wallpaper-custom .tool-panel,
-.wallpaper-custom .endpoint-lab {
-	overflow: hidden;
-}
-
-.wallpaper-custom .card:not(.settings-panel):not(.tool-panel),
-.wallpaper-custom .endpoint-lab,
-.wallpaper-custom .quote-card {
-	padding: clamp(16px, 1.6vw, 22px);
-}
-
-.wallpaper-custom .card-title {
-	margin-bottom: 12px;
-	padding: 0 0 12px;
-}
-
-.wallpaper-custom .subline,
-.wallpaper-custom .news-list,
-.wallpaper-custom .rank-list,
-.wallpaper-custom .tabs,
-.wallpaper-custom .category-tabs,
-.wallpaper-custom .market-grid,
-.wallpaper-custom .weather-body,
-.wallpaper-custom .weather-detail-grid,
-.wallpaper-custom .hourly-row,
-.wallpaper-custom .tool-grid,
-.wallpaper-custom .favorite-grid,
-.wallpaper-custom .entertainment-sections {
-	padding-right: 0;
-	padding-left: 0;
-}
-
-.wallpaper-custom .subline {
-	padding-bottom: 12px;
 }
 
 .wallpaper-custom .search-box {
@@ -7616,13 +7682,6 @@ main > .page-stack:first-child {
 	backdrop-filter: blur(14px) saturate(1.08);
 }
 
-.wallpaper-custom .metric {
-	min-height: 76px;
-	padding: 10px 12px;
-	border-left: 0;
-	border-radius: 10px;
-}
-
 .wallpaper-custom .weather-body,
 .wallpaper-custom .tool-panel-body,
 .wallpaper-custom .settings-section,
@@ -7630,10 +7689,6 @@ main > .page-stack:first-child {
 .wallpaper-custom .endpoint-lab .endpoint-runner {
 	min-width: 0;
 	border-radius: 12px;
-}
-
-.wallpaper-custom .weather-card .weather-body {
-	padding: 0;
 }
 
 .wallpaper-custom .endpoint-lab .endpoint-list {
@@ -7699,11 +7754,6 @@ main > .page-stack:first-child {
 	.wallpaper-custom .endpoint-lab {
 		border-radius: 12px;
 	}
-
-	.wallpaper-custom .weather-card .weather-body {
-		padding-right: 0;
-		padding-left: 0;
-	}
 }
 
 /* Final compact link and rank cleanup. */
@@ -7757,12 +7807,6 @@ main > .page-stack:first-child {
 	border-top: 0;
 }
 
-.page-stack > .market-strip .card-title,
-.page-stack > .market-strip .market-grid {
-	padding-right: 0;
-	padding-left: 0;
-}
-
 .wallpaper-custom .config-action-grid a {
 	border: 1px solid var(--line);
 	border-radius: 10px;
@@ -7780,14 +7824,27 @@ main > .page-stack:first-child {
 /* Keep desktop navigation text readable until the mobile breakpoint. */
 @media (min-width: 761px) and (max-width: 1180px) {
 	.topbar,
-	.chrome-floating .topbar {
-		grid-template-columns: minmax(132px, 1fr) auto minmax(120px, auto);
-		gap: 10px;
+	.chrome-floating .topbar,
+	.app-shell.chrome-floating .topbar {
+		grid-template-columns: minmax(132px, 180px) minmax(280px, 1fr) minmax(
+				132px,
+				180px
+			);
+		gap: clamp(8px, 1.5vw, 14px);
+	}
+
+	.topbar nav,
+	.theme-dark .topbar nav,
+	.theme-dark.chrome-floating .topbar nav {
+		background: transparent;
 	}
 
 	.topbar nav {
 		width: auto;
+		min-width: 0;
 		height: 100%;
+		justify-self: center;
+		justify-content: center;
 		gap: 2px;
 		padding: 0;
 		border: 0;
@@ -7799,7 +7856,7 @@ main > .page-stack:first-child {
 		width: auto;
 		min-width: 0;
 		height: 100%;
-		padding: 0 8px;
+		padding: 0 clamp(6px, 0.9vw, 10px);
 		border: 0;
 		border-bottom: 2px solid transparent;
 		border-radius: 0;
@@ -7807,8 +7864,16 @@ main > .page-stack:first-child {
 		color: var(--muted);
 	}
 
+	.theme-dark .topbar nav button,
+	.theme-dark.chrome-floating .topbar nav button {
+		background: transparent;
+		color: var(--muted);
+	}
+
 	.topbar nav button.active,
-	.theme-dark .topbar nav button.active {
+	.chrome-floating .topbar nav button.active,
+	.theme-dark .topbar nav button.active,
+	.theme-dark.chrome-floating .topbar nav button.active {
 		border-bottom: 2px solid var(--accent);
 		background: transparent;
 		color: var(--accent);
