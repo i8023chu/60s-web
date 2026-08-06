@@ -77,16 +77,6 @@ bun run preview
 
 感谢 [vikiboss/60s](https://github.com/vikiboss/60s) 提供高质量、开源、可靠的开放 API。本项目专注于前端展示、个性化配置和日常浏览体验。
 
-## 📈 项目 Star 历史
-
-<a href="https://www.star-history.com/?repos=dogxii%2F60s-web&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=dogxii/60s-web&type=date&theme=dark&legend=top-left&sealed_token=FLNSE2tbce1PhoJvguKrbfTTbE-UKf-Cxc9pDxYzdQY7g9bFCOxAj1WGo4tCPpjHvxHtqBb_mYBU4Q5TPgFd20B5rOrOkweRrPLNra1SgUnWb8LTBVbYhuwCk-gi0CNCLzWh3hPBGYAfD1nM-ApLNH0CSopznpSnWDEFtJO9tHogRcfMY83qk_9cMarN" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=dogxii/60s-web&type=date&legend=top-left&sealed_token=FLNSE2tbce1PhoJvguKrbfTTbE-UKf-Cxc9pDxYzdQY7g9bFCOxAj1WGo4tCPpjHvxHtqBb_mYBU4Q5TPgFd20B5rOrOkweRrPLNra1SgUnWb8LTBVbYhuwCk-gi0CNCLzWh3hPBGYAfD1nM-ApLNH0CSopznpSnWDEFtJO9tHogRcfMY83qk_9cMarN" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=dogxii/60s-web&type=date&legend=top-left&sealed_token=FLNSE2tbce1PhoJvguKrbfTTbE-UKf-Cxc9pDxYzdQY7g9bFCOxAj1WGo4tCPpjHvxHtqBb_mYBU4Q5TPgFd20B5rOrOkweRrPLNra1SgUnWb8LTBVbYhuwCk-gi0CNCLzWh3hPBGYAfD1nM-ApLNH0CSopznpSnWDEFtJO9tHogRcfMY83qk_9cMarN" />
- </picture>
-</a>
-
 ## 🪪 License
 
 MIT [@Dogxi](https://github.com/dogxii)
